@@ -1662,21 +1662,21 @@ fun PermissionGateScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "SETUP INSTRUCTIONS",
+                    text = "LATEST ANDROID FIX (RESTRICTED SETTINGS)",
                     style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontWeight = FontWeight.Black),
                     color = com.example.ui.theme.FrostedPrimary
                 )
 
                 InstructionStepRow(
                     stepNumber = "1",
-                    title = "Open settings",
-                    desc = "Tap the 'Activate ActiveShield' button below.",
+                    title = "If taken to 'App Info'",
+                    desc = "Tap the ⋮ dots (top right) and select 'Allow restricted settings'. If none exist, go to Step 2.",
                     textColor = textColor
                 )
                 InstructionStepRow(
                     stepNumber = "2",
-                    title = "Locate ZenLock",
-                    desc = "Find 'ZenLock' under Installed Services or Downloaded Apps.",
+                    title = "Open Accessibility",
+                    desc = "Tap the button below. Find 'ZenLock' under 'Downloaded Apps' or 'Installed Services'.",
                     textColor = textColor
                 )
                 InstructionStepRow(
