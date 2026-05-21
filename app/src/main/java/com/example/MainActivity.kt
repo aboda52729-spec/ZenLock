@@ -480,7 +480,9 @@ fun ZenLockApp(
                     isDarkTheme = isDarkTheme,
                     onEnableShield = {
                         try {
-                            android.widget.Toast.makeText(context, "If taken to 'App Info', tap the top right dots and 'Allow restricted settings'", android.widget.Toast.LENGTH_LONG).show()
+                            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                                android.widget.Toast.makeText(context, "If taken to 'App Info', tap the top right dots and 'Allow restricted settings'", android.widget.Toast.LENGTH_LONG).show()
+                            }
                             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                             context.startActivity(intent)
                         } catch (e: Exception) {
@@ -567,7 +569,9 @@ fun SetupScreen(
             ShieldStatusBanner(
                 isActive = isShieldActive,
                 onClick = {
-                    android.widget.Toast.makeText(context, "If taken to 'App Info', tap the top right dots and 'Allow restricted settings'", android.widget.Toast.LENGTH_LONG).show()
+                    if (android.os.Build.VERSION.SDK_INT >= 33) {
+                        android.widget.Toast.makeText(context, "If taken to 'App Info', tap the top right dots and 'Allow restricted settings'", android.widget.Toast.LENGTH_LONG).show()
+                    }
                     val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     context.startActivity(intent)
                 }
@@ -1562,20 +1566,18 @@ fun PermissionGateScreen(
         label = "glow"
     )
 
-    // Force "Security" screens to use dark minimalist aesthetic for gravity
-    val screenBg = Color(0xFF0F0F12)
-    val textColor = Color(0xFFF1F5F9)
-    val textSecondary = Color(0xFF94A3B8)
+    val isDark = isSystemInDarkTheme()
+    val textColor = MaterialTheme.colorScheme.onBackground
+    val textSecondary = MaterialTheme.colorScheme.onSurfaceVariant
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = screenBg
+        containerColor = Color.Transparent
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .background(screenBg) // Force background
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1595,7 +1597,7 @@ fun PermissionGateScreen(
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    com.example.ui.theme.FrostedPrimary.copy(alpha = 0.35f * glowAlpha),
+                                    com.example.ui.theme.FrostedPrimary.copy(alpha = if (isDark) 0.35f * glowAlpha else 0.18f * glowAlpha),
                                     Color.Transparent
                                 )
                             )
@@ -1607,8 +1609,8 @@ fun PermissionGateScreen(
                     modifier = Modifier
                         .size(100.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.05f))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+                        .background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.03f))
+                        .border(1.dp, if (isDark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.08f), CircleShape)
                         .padding(12.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1652,27 +1654,27 @@ fun PermissionGateScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White.copy(alpha = 0.04f))
-                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
+                    .background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.03f))
+                    .border(1.dp, if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f), RoundedCornerShape(24.dp))
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "LATEST ANDROID FIX (RESTRICTED SETTINGS)",
+                    text = "SETUP INSTRUCTIONS",
                     style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontWeight = FontWeight.Black),
                     color = com.example.ui.theme.FrostedPrimary
                 )
 
                 InstructionStepRow(
                     stepNumber = "1",
-                    title = "If taken to 'App Info'",
-                    desc = "Tap the ⋮ dots (top right) and select 'Allow restricted settings'. If none exist, go to Step 2.",
+                    title = "Open settings",
+                    desc = "Tap the 'Activate ActiveShield' button below.",
                     textColor = textColor
                 )
                 InstructionStepRow(
                     stepNumber = "2",
-                    title = "Open Accessibility",
-                    desc = "Tap the button below. Find 'ZenLock' under 'Downloaded Apps' or 'Installed Services'.",
+                    title = "Locate ZenLock",
+                    desc = "Find 'ZenLock' under Installed Services or Downloaded Apps.",
                     textColor = textColor
                 )
                 InstructionStepRow(
@@ -1705,13 +1707,13 @@ fun PermissionGateScreen(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Security,
-                        contentDescription = "Security Active Icon",
+                        imageVector = Icons.Filled.Shield,
+                        contentDescription = "Shield Active Icon",
                         tint = Color.White
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Open Accessibility Settings",
+                        text = "Activate ActiveShield",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )

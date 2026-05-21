@@ -119,3 +119,30 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+// Automatically generate density-specific legacy fallback launcher PNGs (Configuration Cache friendly)
+tasks.register("copyLauncherIcons") {
+  val projectDirFile = project.layout.projectDirectory.asFile
+  val src = File(projectDirFile, "src/main/res/drawable/custom_app_icon.png")
+  inputs.file(src)
+  val densities = listOf("hdpi", "mdpi", "xhdpi", "xxhdpi", "xxxhdpi")
+  densities.forEach { d ->
+    outputs.file(File(projectDirFile, "src/main/res/mipmap-$d/ic_launcher.png"))
+    outputs.file(File(projectDirFile, "src/main/res/mipmap-$d/ic_launcher_round.png"))
+  }
+  
+  doLast {
+    if (src.exists()) {
+      densities.forEach { d ->
+        val destDir = File(projectDirFile, "src/main/res/mipmap-$d")
+        destDir.mkdirs()
+        src.copyTo(File(destDir, "ic_launcher.png"), overwrite = true)
+        src.copyTo(File(destDir, "ic_launcher_round.png"), overwrite = true)
+      }
+    }
+  }
+}
+
+tasks.named("preBuild") {
+  dependsOn("copyLauncherIcons")
+}
