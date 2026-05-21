@@ -60,6 +60,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.ui.graphics.ImageBitmap
 
 class MainActivity : ComponentActivity() {
     private val blockedAppNameState = androidx.compose.runtime.mutableStateOf<String?>(null)
@@ -125,6 +128,15 @@ data class DeviceAppInfo(
     val color: Color
 )
 
+object AppIconCache {
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, ImageBitmap>()
+    
+    fun get(packageName: String): ImageBitmap? = cache[packageName]
+    fun put(packageName: String, bitmap: ImageBitmap) {
+        cache[packageName] = bitmap
+    }
+}
+
 @Composable
 fun AppIcon(
     packageName: String,
@@ -134,16 +146,32 @@ fun AppIcon(
     textStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleMedium
 ) {
     val context = LocalContext.current
-    val appIcon = remember(packageName) {
-        try {
-            val pm = context.packageManager
-            val drawable = pm.getApplicationIcon(packageName)
-            drawable.toBitmap(width = 120, height = 120).asImageBitmap()
-        } catch (e: Exception) {
-            null
+    var bitmapState by remember(packageName) { mutableStateOf<ImageBitmap?>(AppIconCache.get(packageName)) }
+
+    if (bitmapState == null) {
+        LaunchedEffect(packageName) {
+            val cached = AppIconCache.get(packageName)
+            if (cached != null) {
+                bitmapState = cached
+            } else {
+                val b = withContext(Dispatchers.IO) {
+                    try {
+                        val pm = context.packageManager
+                        val drawable = pm.getApplicationIcon(packageName)
+                        drawable.toBitmap(width = 100, height = 100).asImageBitmap()
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                if (b != null) {
+                    AppIconCache.put(packageName, b)
+                    bitmapState = b
+                }
+            }
         }
     }
 
+    val appIcon = bitmapState
     if (appIcon != null) {
         Image(
             bitmap = appIcon,
@@ -172,15 +200,20 @@ fun BlockedNotificationDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val appLabel = remember(packageName) {
-        try {
-            val pm = context.packageManager
-            val info = pm.getApplicationInfo(packageName, 0)
-            pm.getApplicationLabel(info).toString()
-        } catch (e: Exception) {
-            packageName
+    var appLabelState by remember(packageName) { mutableStateOf(packageName) }
+    LaunchedEffect(packageName) {
+        val label = withContext(Dispatchers.IO) {
+            try {
+                val pm = context.packageManager
+                val info = pm.getApplicationInfo(packageName, 0)
+                pm.getApplicationLabel(info).toString()
+            } catch (e: Exception) {
+                packageName
+            }
         }
+        appLabelState = label
     }
+    val appLabel = appLabelState
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -354,9 +387,13 @@ fun ZenLockApp(
         )
     }
 
-    // Fetch installed apps on launch
-    LaunchedEffect(Unit) {
-        installedApps = getInstalledLauncherApps(context)
+    // Fetch installed apps on launch (lazily deferred until shield permission is active to optimize performance)
+    LaunchedEffect(isShieldActive) {
+        if (isShieldActive && installedApps.isEmpty()) {
+            installedApps = withContext(Dispatchers.IO) {
+                getInstalledLauncherApps(context)
+            }
+        }
     }
 
     // Continuously monitor shield state when in app
@@ -431,14 +468,26 @@ fun ZenLockApp(
             }
     ) {
         AnimatedContent(
-            targetState = isLockdown,
+            targetState = isLockdown to isShieldActive,
             transitionSpec = {
                 (fadeIn(animationSpec = tween(600)) + scaleIn(initialScale = 0.9f)) togetherWith
                         (fadeOut(animationSpec = tween(600)) + scaleOut(targetScale = 1.1f))
             },
             label = "AppScreenTransition"
-        ) { lockdown ->
-            if (lockdown) {
+        ) { (lockdown, active) ->
+            if (!active) {
+                PermissionGateScreen(
+                    isDarkTheme = isDarkTheme,
+                    onEnableShield = {
+                        try {
+                            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                )
+            } else if (lockdown) {
                 val activeEndTime = LockSettings.getLockdownEndTime(context)
                 val currentRem = maxOf(0L, (activeEndTime - System.currentTimeMillis()) / 1000L).toInt()
                 val actualTime = if (currentRem > 0) currentRem else lockdownDurationSecs
@@ -899,19 +948,12 @@ fun AppSelectionRow(
                 fallbackColor = app.color
             )
             Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = app.label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = app.packageName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = app.label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
         Checkbox(
             checked = isChecked,
@@ -1488,6 +1530,242 @@ fun EmergencyUnlockButton(onUnlock: () -> Unit) {
                 text = "TO EXIT",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFF94A3B8)
+            )
+        }
+    }
+}
+
+@Composable
+fun PermissionGateScreen(
+    isDarkTheme: Boolean,
+    onEnableShield: () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "ShieldPulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
+    )
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = Color.Transparent
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Header visual shield
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(170.dp)
+            ) {
+                // Outer breathing ambient glow aura
+                Box(
+                    modifier = Modifier
+                        .size(140.dp)
+                        .scale(pulseScale)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    com.example.ui.theme.FrostedPrimary.copy(alpha = 0.25f * glowAlpha),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
+                // High-fidelity Glassmorphic circle
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.04f))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Shield,
+                        contentDescription = "Shield Required Icon",
+                        tint = com.example.ui.theme.FrostedPrimary,
+                        modifier = Modifier
+                            .size(52.dp)
+                            .scale(pulseScale)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "ActiveShield Required",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.5).sp
+                ),
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "ZenLock needs active accessibility permissions to securely shield distracting applications. This cannot be bypassed.",
+                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                color = Color.White.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // Premium visual guide checklist
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.White.copy(alpha = 0.03f))
+                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(24.dp))
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "SETUP INSTRUCTIONS",
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontWeight = FontWeight.Black),
+                    color = com.example.ui.theme.FrostedPrimary
+                )
+
+                InstructionStepRow(
+                    stepNumber = "1",
+                    title = "Open settings",
+                    desc = "Tap the 'Activate ActiveShield' button below."
+                )
+                InstructionStepRow(
+                    stepNumber = "2",
+                    title = "Locate ZenLock",
+                    desc = "Find 'ZenLock' under Installed Services or Downloaded Apps."
+                )
+                InstructionStepRow(
+                    stepNumber = "3",
+                    title = "Toggle Switch",
+                    desc = "Enable 'Use ZenLock' to activate the secure shield."
+                )
+            }
+
+            Spacer(modifier = Modifier.height(44.dp))
+
+            Button(
+                onClick = onEnableShield,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = com.example.ui.theme.FrostedPrimary
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(18.dp)),
+                shape = RoundedCornerShape(18.dp),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 8.dp,
+                    pressedElevation = 2.dp
+                )
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Security,
+                        contentDescription = "Security Active Icon",
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Activate ActiveShield",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = Color.White.copy(alpha = 0.5f),
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Waiting for service activation...",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.5f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun InstructionStepRow(
+    stepNumber: String,
+    title: String,
+    desc: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(com.example.ui.theme.FrostedPrimary.copy(alpha = 0.15f))
+                .border(1.dp, com.example.ui.theme.FrostedPrimary.copy(alpha = 0.3f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = stepNumber,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                color = com.example.ui.theme.FrostedPrimary
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color.White
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = desc,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.6f)
             )
         }
     }
