@@ -1566,18 +1566,20 @@ fun PermissionGateScreen(
         label = "glow"
     )
 
-    val isDark = isSystemInDarkTheme()
-    val textColor = MaterialTheme.colorScheme.onBackground
-    val textSecondary = MaterialTheme.colorScheme.onSurfaceVariant
+    // Force "Security" screens to use dark minimalist aesthetic for gravity
+    val screenBg = Color(0xFF0F0F12)
+    val textColor = Color(0xFFF1F5F9)
+    val textSecondary = Color(0xFF94A3B8)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent
+        containerColor = screenBg
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
+                .background(screenBg) // Force background
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1597,7 +1599,7 @@ fun PermissionGateScreen(
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    com.example.ui.theme.FrostedPrimary.copy(alpha = if (isDark) 0.35f * glowAlpha else 0.18f * glowAlpha),
+                                    com.example.ui.theme.FrostedPrimary.copy(alpha = 0.35f * glowAlpha),
                                     Color.Transparent
                                 )
                             )
@@ -1609,8 +1611,8 @@ fun PermissionGateScreen(
                     modifier = Modifier
                         .size(100.dp)
                         .clip(CircleShape)
-                        .background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.03f))
-                        .border(1.dp, if (isDark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.08f), CircleShape)
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
                         .padding(12.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1654,8 +1656,8 @@ fun PermissionGateScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.03f))
-                    .border(1.dp, if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f), RoundedCornerShape(24.dp))
+                    .background(Color.White.copy(alpha = 0.04f))
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
