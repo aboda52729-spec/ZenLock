@@ -362,6 +362,13 @@ fun isAccessibilityServiceEnabled(context: Context): Boolean {
     return false
 }
 
+// Check if notification listener service is enabled
+fun isNotificationServiceEnabled(context: Context): Boolean {
+    val pkgName = context.packageName
+    val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+    return flat != null && flat.contains(pkgName)
+}
+
 @Composable
 fun ZenLockApp(
     isDarkTheme: Boolean,
@@ -381,6 +388,7 @@ fun ZenLockApp(
     
     // Shield configuration state
     var isShieldActive by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
+    var isStealthActive by remember { mutableStateOf(isNotificationServiceEnabled(context)) }
 
     if (blockedPackage != null) {
         BlockedNotificationDialog(
@@ -402,6 +410,7 @@ fun ZenLockApp(
     LaunchedEffect(isLockdown) {
         while (true) {
             isShieldActive = isAccessibilityServiceEnabled(context)
+            isStealthActive = isNotificationServiceEnabled(context)
             delay(2000)
         }
     }
@@ -515,6 +524,7 @@ fun ZenLockApp(
                     selectedApps = selectedApps,
                     installedApps = installedApps,
                     isShieldActive = isShieldActive,
+                    isStealthActive = isStealthActive,
                     onAppToggle = { pkgName ->
                         selectedApps = if (selectedApps.contains(pkgName)) {
                             selectedApps - pkgName
@@ -545,6 +555,7 @@ fun SetupScreen(
     selectedApps: Set<String>,
     installedApps: List<DeviceAppInfo>,
     isShieldActive: Boolean,
+    isStealthActive: Boolean,
     onAppToggle: (String) -> Unit,
     onStart: () -> Unit
 ) {
@@ -575,6 +586,17 @@ fun SetupScreen(
                         android.widget.Toast.makeText(context, "If taken to 'App Info', tap the top right dots and 'Allow restricted settings'", android.widget.Toast.LENGTH_LONG).show()
                     }
                     val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    context.startActivity(intent)
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Notification Stealth Mode Banner
+            StealthStatusBanner(
+                isActive = isStealthActive,
+                onClick = {
+                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                     context.startActivity(intent)
                 }
             )
@@ -809,6 +831,77 @@ fun ShieldStatusBanner(isActive: Boolean, onClick: () -> Unit) {
     }
 }
 
+@Composable
+fun StealthStatusBanner(isActive: Boolean, onClick: () -> Unit) {
+    val containerColor by animateColorAsState(
+        targetValue = if (isActive) Color(0x153B82F6) else Color(0x05000000), // Blue tint or very faint
+        label = "bannerBg"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isActive) Color(0x443B82F6) else Color(0x1A000000),
+        label = "bannerBorder"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(containerColor)
+            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+            .clickable { onClick() }
+            .padding(16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = if (isActive) Icons.Filled.CheckCircle else Icons.Filled.Info,
+                    contentDescription = null,
+                    tint = if (isActive) Color(0xFF3B82F6) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = if (isActive) "Stealth Mode Enabled" else "Stealth Mode Disabled",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isActive) Color(0xFF3B82F6) else MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = if (isActive) "Hides notifications for blocked apps" else "Grant notification access to hide notifications",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            if (!isActive) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF8B5CF6)) // Purple accent for stealth
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "ENABLE",
+                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
 // Complete Searchable App Selector Overlay Modal/Dialog
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -839,7 +932,7 @@ fun AppPickerDialog(
                     .fillMaxWidth()
                     .fillMaxHeight(0.85f),
                 shape = RoundedCornerShape(28.dp),
-                color = if (isSystemInDarkTheme()) com.example.ui.theme.FrostedBackgroundDark else com.example.ui.theme.FrostedBackgroundLight,
+                color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp
             ) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {

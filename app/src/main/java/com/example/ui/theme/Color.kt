@@ -13,7 +13,7 @@ val FrostedTextLight = Color(0xFF0F172A) // Slate 900
 val FrostedTextSecondaryDark = Color(0xFF94A3B8) // Slate 400
 val FrostedTextSecondaryLight = Color(0xFF64748B) // Slate 500
 
-val FrostedGlassDark = Color(0x1AFFFFFF) // White 10%
-val FrostedGlassLight = Color(0x0D000000) // Black 5%
-val FrostedBorderDark = Color(0x33FFFFFF) // White 20%
-val FrostedBorderLight = Color(0x1A000000) // Black 10%
+val FrostedGlassDark = Color(0xFF23232C) // Solid dark gray
+val FrostedGlassLight = Color(0xFFFFFFFF) // Solid white
+val FrostedBorderDark = Color(0xFF3B3B46) // Solid border
+val FrostedBorderLight = Color(0xFFE2E8F0) // Solid border
