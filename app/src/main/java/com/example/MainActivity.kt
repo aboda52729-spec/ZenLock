@@ -62,8 +62,11 @@ import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
+    private val blockedAppNameState = androidx.compose.runtime.mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleIntent(intent)
         enableEdgeToEdge()
         setContent {
             var isDarkTheme by remember { mutableStateOf<Boolean?>(null) }
@@ -89,10 +92,28 @@ class MainActivity : ComponentActivity() {
             }
 
             MyApplicationTheme(darkTheme = useDark) {
+                val blockedPackage by blockedAppNameState
                 ZenLockApp(
                     isDarkTheme = useDark,
-                    onToggleTheme = { isDarkTheme = !useDark }
+                    onToggleTheme = { isDarkTheme = !useDark },
+                    blockedPackage = blockedPackage,
+                    onClearBlockedMessage = { blockedAppNameState.value = null }
                 )
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent != null && intent.getBooleanExtra("FROM_BLOCK_TRIGGER", false)) {
+            val pkg = intent.getStringExtra("BLOCKED_APP_NAME")
+            if (pkg != null) {
+                blockedAppNameState.value = pkg
             }
         }
     }
@@ -141,6 +162,96 @@ fun AppIcon(
                 color = Color.White,
                 fontWeight = FontWeight.Black
             )
+        }
+    }
+}
+
+@Composable
+fun BlockedNotificationDialog(
+    packageName: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val appLabel = remember(packageName) {
+        try {
+            val pm = context.packageManager
+            val info = pm.getApplicationInfo(packageName, 0)
+            pm.getApplicationLabel(info).toString()
+        } catch (e: Exception) {
+            packageName
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                tonalElevation = 6.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFEF4444).copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AppIcon(
+                            packageName = packageName,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape),
+                            fallbackLabel = appLabel,
+                            fallbackColor = Color(0xFFEF4444)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "ZenLock Shield Active",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFEF4444)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "\"$appLabel\" is currently blocked under your active focus session.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Button(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFEF4444)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Keep Focusing", color = Color.White)
+                    }
+                }
+            }
         }
     }
 }
@@ -217,7 +328,12 @@ fun isAccessibilityServiceEnabled(context: Context): Boolean {
 }
 
 @Composable
-fun ZenLockApp(isDarkTheme: Boolean, onToggleTheme: () -> Unit) {
+fun ZenLockApp(
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit,
+    blockedPackage: String?,
+    onClearBlockedMessage: () -> Unit
+) {
     val context = LocalContext.current
     
     // Core state loaded selectively from real persisted settings
@@ -230,6 +346,13 @@ fun ZenLockApp(isDarkTheme: Boolean, onToggleTheme: () -> Unit) {
     
     // Shield configuration state
     var isShieldActive by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
+
+    if (blockedPackage != null) {
+        BlockedNotificationDialog(
+            packageName = blockedPackage,
+            onDismiss = onClearBlockedMessage
+        )
+    }
 
     // Fetch installed apps on launch
     LaunchedEffect(Unit) {
@@ -322,6 +445,8 @@ fun ZenLockApp(isDarkTheme: Boolean, onToggleTheme: () -> Unit) {
                 
                 LockdownScreen(
                     durationSecs = actualTime,
+                    selectedApps = selectedApps,
+                    installedApps = installedApps,
                     onUnlock = {
                         LockSettings.setLockdown(context, false)
                         isLockdown = false
@@ -1069,7 +1194,12 @@ fun StartButton(onClick: () -> Unit, enabled: Boolean) {
 }
 
 @Composable
-fun LockdownScreen(durationSecs: Int, onUnlock: () -> Unit) {
+fun LockdownScreen(
+    durationSecs: Int,
+    selectedApps: Set<String>,
+    installedApps: List<DeviceAppInfo>,
+    onUnlock: () -> Unit
+) {
     var timeLeft by remember { mutableIntStateOf(durationSecs) }
     
     LaunchedEffect(Unit) {
@@ -1227,7 +1357,60 @@ fun LockdownScreen(durationSecs: Int, onUnlock: () -> Unit) {
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(64.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Shielded applications icons display with dynamic loading
+            val filteredShielded = installedApps.filter { selectedApps.contains(it.packageName) }
+            if (filteredShielded.isNotEmpty()) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "SHIELDED APPLICATIONS",
+                        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontSize = 9.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.4f)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.White.copy(alpha = 0.04f))
+                            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(16.dp))
+                            .padding(10.dp)
+                    ) {
+                        filteredShielded.take(6).forEach { app ->
+                            AppIcon(
+                                packageName = app.packageName,
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape),
+                                fallbackLabel = app.label,
+                                fallbackColor = app.color,
+                                textStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Black)
+                            )
+                        }
+                        if (filteredShielded.size > 6) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "+${filteredShielded.size - 6}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(48.dp))
 
             EmergencyUnlockButton(onUnlock)
         }

@@ -32,6 +32,16 @@ jobs:
           touch .env
           if [ ! -f .env.example ]; then touch .env.example; fi
 
+      - name: Decode Debug Keystore
+        run: |
+          if [ -f debug.keystore.base64 ] && [ -s debug.keystore.base64 ]; then
+            echo "Decoding existing debug.keystore.base64..."
+            base64 -d debug.keystore.base64 > debug.keystore
+          else
+            echo "No debug.keystore.base64 found, generating a fallback debug keystore..."
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon
 
