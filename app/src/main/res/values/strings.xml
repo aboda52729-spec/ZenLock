@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">ZenLock</string>
+    <string name="accessibility_description">ZenLock Active Shield uses this service to lock targeted distracting applications instantly during a focus session, shielding your flow on a system level.</string>
+</resources>
