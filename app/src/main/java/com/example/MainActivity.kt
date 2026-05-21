@@ -1599,8 +1599,8 @@ fun PermissionGateScreen(
                     modifier = Modifier
                         .size(100.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.04f))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.04f))
+                        .border(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f), CircleShape)
                         .padding(12.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1623,7 +1623,7 @@ fun PermissionGateScreen(
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = (-0.5).sp
                 ),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center
             )
 
@@ -1632,7 +1632,7 @@ fun PermissionGateScreen(
             Text(
                 text = "ZenLock needs active accessibility permissions to securely shield distracting applications. This cannot be bypassed.",
                 style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
-                color = Color.White.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
@@ -1644,8 +1644,8 @@ fun PermissionGateScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White.copy(alpha = 0.03f))
-                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.03f))
+                    .border(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f), RoundedCornerShape(24.dp))
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -1658,17 +1658,20 @@ fun PermissionGateScreen(
                 InstructionStepRow(
                     stepNumber = "1",
                     title = "Open settings",
-                    desc = "Tap the 'Activate ActiveShield' button below."
+                    desc = "Tap the 'Activate ActiveShield' button below.",
+                    textColor = MaterialTheme.colorScheme.onBackground
                 )
                 InstructionStepRow(
                     stepNumber = "2",
                     title = "Locate ZenLock",
-                    desc = "Find 'ZenLock' under Installed Services or Downloaded Apps."
+                    desc = "Find 'ZenLock' under Installed Services or Downloaded Apps.",
+                    textColor = MaterialTheme.colorScheme.onBackground
                 )
                 InstructionStepRow(
                     stepNumber = "3",
                     title = "Toggle Switch",
-                    desc = "Enable 'Use ZenLock' to activate the secure shield."
+                    desc = "Enable 'Use ZenLock' to activate the secure shield.",
+                    textColor = MaterialTheme.colorScheme.onBackground
                 )
             }
 
@@ -1716,14 +1719,14 @@ fun PermissionGateScreen(
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
-                    color = Color.White.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
                     strokeWidth = 2.dp
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Waiting for service activation...",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                 )
             }
         }
@@ -1734,7 +1737,8 @@ fun PermissionGateScreen(
 fun InstructionStepRow(
     stepNumber: String,
     title: String,
-    desc: String
+    desc: String,
+    textColor: Color
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1759,13 +1763,13 @@ fun InstructionStepRow(
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                color = Color.White
+                color = textColor
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = desc,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.6f)
+                color = textColor.copy(alpha = 0.6f)
             )
         }
     }
