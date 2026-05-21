@@ -480,6 +480,7 @@ fun ZenLockApp(
                     isDarkTheme = isDarkTheme,
                     onEnableShield = {
                         try {
+                            android.widget.Toast.makeText(context, "If taken to 'App Info', tap the top right dots and 'Allow restricted settings'", android.widget.Toast.LENGTH_LONG).show()
                             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                             context.startActivity(intent)
                         } catch (e: Exception) {
@@ -566,6 +567,7 @@ fun SetupScreen(
             ShieldStatusBanner(
                 isActive = isShieldActive,
                 onClick = {
+                    android.widget.Toast.makeText(context, "If taken to 'App Info', tap the top right dots and 'Allow restricted settings'", android.widget.Toast.LENGTH_LONG).show()
                     val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     context.startActivity(intent)
                 }
@@ -1560,14 +1562,20 @@ fun PermissionGateScreen(
         label = "glow"
     )
 
+    // Force "Security" screens to use dark minimalist aesthetic for gravity
+    val screenBg = Color(0xFF0F0F12)
+    val textColor = Color(0xFFF1F5F9)
+    val textSecondary = Color(0xFF94A3B8)
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent
+        containerColor = screenBg
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
+                .background(screenBg) // Force background
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1587,7 +1595,7 @@ fun PermissionGateScreen(
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    com.example.ui.theme.FrostedPrimary.copy(alpha = 0.25f * glowAlpha),
+                                    com.example.ui.theme.FrostedPrimary.copy(alpha = 0.35f * glowAlpha),
                                     Color.Transparent
                                 )
                             )
@@ -1599,8 +1607,8 @@ fun PermissionGateScreen(
                     modifier = Modifier
                         .size(100.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.04f))
-                        .border(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f), CircleShape)
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
                         .padding(12.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1615,7 +1623,7 @@ fun PermissionGateScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Text(
                 text = "ActiveShield Required",
@@ -1623,7 +1631,7 @@ fun PermissionGateScreen(
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = (-0.5).sp
                 ),
-                color = MaterialTheme.colorScheme.onBackground,
+                color = textColor,
                 textAlign = TextAlign.Center
             )
 
@@ -1632,50 +1640,50 @@ fun PermissionGateScreen(
             Text(
                 text = "ZenLock needs active accessibility permissions to securely shield distracting applications. This cannot be bypassed.",
                 style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                color = textSecondary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             // Premium visual guide checklist
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.03f))
-                    .border(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f), RoundedCornerShape(24.dp))
+                    .background(Color.White.copy(alpha = 0.04f))
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "SETUP INSTRUCTIONS",
+                    text = "LATEST ANDROID FIX (RESTRICTED SETTINGS)",
                     style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontWeight = FontWeight.Black),
                     color = com.example.ui.theme.FrostedPrimary
                 )
 
                 InstructionStepRow(
                     stepNumber = "1",
-                    title = "Open settings",
-                    desc = "Tap the 'Activate ActiveShield' button below.",
-                    textColor = MaterialTheme.colorScheme.onBackground
+                    title = "If taken to 'App Info'",
+                    desc = "Tap the ⋮ dots (top right) and select 'Allow restricted settings'. If none exist, go to Step 2.",
+                    textColor = textColor
                 )
                 InstructionStepRow(
                     stepNumber = "2",
-                    title = "Locate ZenLock",
-                    desc = "Find 'ZenLock' under Installed Services or Downloaded Apps.",
-                    textColor = MaterialTheme.colorScheme.onBackground
+                    title = "Open Accessibility",
+                    desc = "Tap the button below. Find 'ZenLock' under 'Downloaded Apps' or 'Installed Services'.",
+                    textColor = textColor
                 )
                 InstructionStepRow(
                     stepNumber = "3",
                     title = "Toggle Switch",
                     desc = "Enable 'Use ZenLock' to activate the secure shield.",
-                    textColor = MaterialTheme.colorScheme.onBackground
+                    textColor = textColor
                 )
             }
 
-            Spacer(modifier = Modifier.height(44.dp))
+            Spacer(modifier = Modifier.height(40.dp))
 
             Button(
                 onClick = onEnableShield,
@@ -1684,9 +1692,9 @@ fun PermissionGateScreen(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .clip(RoundedCornerShape(18.dp)),
-                shape = RoundedCornerShape(18.dp),
+                    .height(60.dp)
+                    .clip(RoundedCornerShape(20.dp)),
+                shape = RoundedCornerShape(20.dp),
                 elevation = ButtonDefaults.buttonElevation(
                     defaultElevation = 8.dp,
                     pressedElevation = 2.dp
@@ -1703,7 +1711,7 @@ fun PermissionGateScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Activate ActiveShield",
+                        text = "Open Accessibility Settings",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
@@ -1719,14 +1727,14 @@ fun PermissionGateScreen(
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                    color = textColor.copy(alpha = 0.5f),
                     strokeWidth = 2.dp
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Waiting for service activation...",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                    color = textColor.copy(alpha = 0.5f)
                 )
             }
         }
