@@ -35,7 +35,7 @@ class FocusAccessibilityService : AccessibilityService() {
                         try {
                             Toast.makeText(
                                 this,
-                                "ZenLock Shield: Access Denied to $packageName",
+                                "🛡️ ZenLock: Focus session active. This app is currently restricted.",
                                 Toast.LENGTH_SHORT
                             ).show()
                         } catch (e: Exception) {

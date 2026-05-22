@@ -362,6 +362,13 @@ fun isAccessibilityServiceEnabled(context: Context): Boolean {
     return false
 }
 
+// Check if device admin is enabled
+fun isDeviceAdminEnabled(context: Context): Boolean {
+    val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+    val componentName = ComponentName(context, FocusDeviceAdminReceiver::class.java)
+    return devicePolicyManager.isAdminActive(componentName)
+}
+
 // Check if notification listener service is enabled
 fun isNotificationServiceEnabled(context: Context): Boolean {
     val pkgName = context.packageName
@@ -389,6 +396,9 @@ fun ZenLockApp(
     // Shield configuration state
     var isShieldActive by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
     var isStealthActive by remember { mutableStateOf(isNotificationServiceEnabled(context)) }
+    var isDeviceAdminActive by remember { mutableStateOf(isDeviceAdminEnabled(context)) }
+
+    val allPermissionsGranted = isShieldActive && isStealthActive && isDeviceAdminActive
 
     if (blockedPackage != null) {
         BlockedNotificationDialog(
@@ -398,8 +408,8 @@ fun ZenLockApp(
     }
 
     // Fetch installed apps on launch (lazily deferred until shield permission is active to optimize performance)
-    LaunchedEffect(isShieldActive) {
-        if (isShieldActive && installedApps.isEmpty()) {
+    LaunchedEffect(allPermissionsGranted) {
+        if (allPermissionsGranted && installedApps.isEmpty()) {
             installedApps = withContext(Dispatchers.IO) {
                 getInstalledLauncherApps(context)
             }
@@ -411,6 +421,7 @@ fun ZenLockApp(
         while (true) {
             isShieldActive = isAccessibilityServiceEnabled(context)
             isStealthActive = isNotificationServiceEnabled(context)
+            isDeviceAdminActive = isDeviceAdminEnabled(context)
             delay(2000)
         }
     }
@@ -479,22 +490,44 @@ fun ZenLockApp(
             }
     ) {
         AnimatedContent(
-            targetState = isLockdown to isShieldActive,
+            targetState = Triple(isLockdown, allPermissionsGranted, Unit),
             transitionSpec = {
                 (fadeIn(animationSpec = tween(600)) + scaleIn(initialScale = 0.9f)) togetherWith
                         (fadeOut(animationSpec = tween(600)) + scaleOut(targetScale = 1.1f))
             },
             label = "AppScreenTransition"
-        ) { (lockdown, active) ->
-            if (!active) {
+        ) { (lockdown, permissionsGranted, _) ->
+            if (!permissionsGranted) {
                 PermissionGateScreen(
                     isDarkTheme = isDarkTheme,
-                    onEnableShield = {
+                    isAccessibilityActive = isShieldActive,
+                    isNotificationActive = isStealthActive,
+                    isDeviceAdminActive = isDeviceAdminActive,
+                    onEnableAccessibility = {
                         try {
                             if (android.os.Build.VERSION.SDK_INT >= 33) {
                                 android.widget.Toast.makeText(context, "If taken to 'App Info', tap the top right dots and 'Allow restricted settings'", android.widget.Toast.LENGTH_LONG).show()
                             }
                             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    },
+                    onEnableNotification = {
+                        try {
+                            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    },
+                    onEnableDeviceAdmin = {
+                        try {
+                            val intent = Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                                putExtra(android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN, ComponentName(context, FocusDeviceAdminReceiver::class.java))
+                                putExtra(android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Required to prevent bypassing the focus lock.")
+                            }
                             context.startActivity(intent)
                         } catch (e: Exception) {
                             e.printStackTrace()
@@ -576,31 +609,6 @@ fun SetupScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
             HeaderBlock(isDarkTheme, onToggleTheme)
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // System-level Accessibility Link banner (System Shield)
-            ShieldStatusBanner(
-                isActive = isShieldActive,
-                onClick = {
-                    if (android.os.Build.VERSION.SDK_INT >= 33) {
-                        android.widget.Toast.makeText(context, "If taken to 'App Info', tap the top right dots and 'Allow restricted settings'", android.widget.Toast.LENGTH_LONG).show()
-                    }
-                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                    context.startActivity(intent)
-                }
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Notification Stealth Mode Banner
-            StealthStatusBanner(
-                isActive = isStealthActive,
-                onClick = {
-                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                    context.startActivity(intent)
-                }
-            )
-            
             Spacer(modifier = Modifier.height(24.dp))
             
             // Apps selected Card
@@ -1642,26 +1650,22 @@ fun EmergencyUnlockButton(onUnlock: () -> Unit) {
 @Composable
 fun PermissionGateScreen(
     isDarkTheme: Boolean,
-    onEnableShield: () -> Unit
+    isAccessibilityActive: Boolean,
+    isNotificationActive: Boolean,
+    isDeviceAdminActive: Boolean,
+    onEnableAccessibility: () -> Unit,
+    onEnableNotification: () -> Unit,
+    onEnableDeviceAdmin: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "ShieldPulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.08f,
+        targetValue = 1.05f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
+            animation = tween(2500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse"
-    )
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow"
     )
 
     // Force "Security" screens to use dark minimalist aesthetic for gravity
@@ -1679,35 +1683,36 @@ fun PermissionGateScreen(
                 .fillMaxSize()
                 .background(screenBg) // Force background
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(horizontal = 24.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Header visual shield
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(170.dp)
+                modifier = Modifier.size(140.dp)
             ) {
                 // Outer breathing ambient glow aura
                 Box(
                     modifier = Modifier
-                        .size(140.dp)
+                        .size(120.dp)
                         .scale(pulseScale)
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    com.example.ui.theme.FrostedPrimary.copy(alpha = 0.35f * glowAlpha),
+                                    com.example.ui.theme.FrostedPrimary.copy(alpha = 0.25f),
                                     Color.Transparent
                                 )
                             )
                         )
                 )
 
-                // High-fidelity Glassmorphic circle
                 Box(
                     modifier = Modifier
-                        .size(100.dp)
+                        .size(80.dp)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.05f))
                         .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
@@ -1715,11 +1720,11 @@ fun PermissionGateScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Shield,
-                        contentDescription = "Shield Required Icon",
+                        imageVector = Icons.Filled.Security,
+                        contentDescription = "Security Setup Icon",
                         tint = com.example.ui.theme.FrostedPrimary,
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(42.dp)
                             .scale(pulseScale)
                     )
                 }
@@ -1728,7 +1733,7 @@ fun PermissionGateScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "ActiveShield Required",
+                text = "Secure Setup Required",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = (-0.5).sp
@@ -1737,10 +1742,10 @@ fun PermissionGateScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "ZenLock needs active accessibility permissions to securely shield distracting applications. This cannot be bypassed.",
+                text = "ZenLock requires 3 secure permissions to completely enforce focus locking and block all system loopholes.",
                 style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
                 color = textSecondary,
                 textAlign = TextAlign.Center,
@@ -1749,78 +1754,40 @@ fun PermissionGateScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Premium visual guide checklist
+            // Permissions list
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White.copy(alpha = 0.04f))
-                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
-                    .padding(20.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = "LATEST ANDROID FIX (RESTRICTED SETTINGS)",
-                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontWeight = FontWeight.Black),
-                    color = com.example.ui.theme.FrostedPrimary
+                // 1. Accessibility
+                PermissionCard(
+                    title = "Active Accessibility Shield",
+                    description = "Required to instantly detect and block distracting applications.",
+                    isGranted = isAccessibilityActive,
+                    icon = Icons.Filled.AccessibilityNew,
+                    onClick = onEnableAccessibility
                 )
 
-                InstructionStepRow(
-                    stepNumber = "1",
-                    title = "If taken to 'App Info'",
-                    desc = "Tap the ⋮ dots (top right) and select 'Allow restricted settings'. If none exist, go to Step 2.",
-                    textColor = textColor
+                // 2. Device Admin
+                PermissionCard(
+                    title = "Device Administrator",
+                    description = "Prevents circumventing the lock, force-stopping the app, or uninstalling it during a session.",
+                    isGranted = isDeviceAdminActive,
+                    icon = Icons.Filled.AdminPanelSettings,
+                    onClick = onEnableDeviceAdmin
                 )
-                InstructionStepRow(
-                    stepNumber = "2",
-                    title = "Open Accessibility",
-                    desc = "Tap the button below. Find 'ZenLock' under 'Downloaded Apps' or 'Installed Services'.",
-                    textColor = textColor
-                )
-                InstructionStepRow(
-                    stepNumber = "3",
-                    title = "Toggle Switch",
-                    desc = "Enable 'Use ZenLock' to activate the secure shield.",
-                    textColor = textColor
+
+                // 3. Notification Access
+                PermissionCard(
+                    title = "Stealth Notifications",
+                    description = "Silently dismisses notifications from blocked apps so you remain focused.",
+                    isGranted = isNotificationActive,
+                    icon = Icons.Filled.NotificationsOff,
+                    onClick = onEnableNotification
                 )
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
-
-            Button(
-                onClick = onEnableShield,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = com.example.ui.theme.FrostedPrimary
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .clip(RoundedCornerShape(20.dp)),
-                shape = RoundedCornerShape(20.dp),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 8.dp,
-                    pressedElevation = 2.dp
-                )
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Shield,
-                        contentDescription = "Shield Active Icon",
-                        tint = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Activate ActiveShield",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1834,11 +1801,80 @@ fun PermissionGateScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Waiting for service activation...",
+                    text = "Awaiting full security clearance...",
                     style = MaterialTheme.typography.labelSmall,
                     color = textColor.copy(alpha = 0.5f)
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun PermissionCard(
+    title: String,
+    description: String,
+    isGranted: Boolean,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    val borderColor = if (isGranted) Color(0xFF10B981) else Color.White.copy(alpha = 0.08f)
+    val bgColor = if (isGranted) Color(0xFF10B981).copy(alpha = 0.05f) else Color.White.copy(alpha = 0.04f)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(bgColor)
+            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+            .clickable(enabled = !isGranted, onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(if (isGranted) Color(0xFF10B981).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isGranted) Icons.Filled.Check else icon,
+                    contentDescription = null,
+                    tint = if (isGranted) Color(0xFF10B981) else Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = if (isGranted) Color.White else Color(0xFFF1F5F9)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.labelSmall.copy(lineHeight = 14.sp),
+                    color = Color(0xFF94A3B8)
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        if (!isGranted) {
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = "Grant",
+                tint = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
