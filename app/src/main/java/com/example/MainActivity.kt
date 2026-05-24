@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.text.TextUtils
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.ui.graphics.asImageBitmap
@@ -30,6 +31,8 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -53,6 +56,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -104,7 +108,9 @@ class MainActivity : ComponentActivity() {
                     isDarkTheme = useDark,
                     onToggleTheme = { isDarkTheme = !useDark },
                     blockedPackage = blockedPackage,
-                    onClearBlockedMessage = { blockedAppNameState.value = null }
+                    onClearBlockedMessage = {
+                        blockedAppNameState.value = null
+                    }
                 )
             }
         }
@@ -241,7 +247,24 @@ fun BlockedNotificationDialog(
             appLabelState = label
         }
     }
-    val appLabel = if (isStealthActive && packageName != "adult_content_blocked_shield") "Blocked" else appLabelState
+
+    // Auto-dismiss the blocked dialog after 4 seconds to prevent it from remaining on screen
+    LaunchedEffect(packageName) {
+        delay(4000)
+        onDismiss()
+    }
+
+    val appLabel = if (isStealthActive && packageName != "adult_content_blocked_shield") {
+        when (selectedLang) {
+            "ar" -> "تطبيق محمي"
+            "es" -> "Aplicación protegida"
+            "fr" -> "Application protégée"
+            "hi" -> "सुरक्षित ऐप"
+            else -> "Protected App"
+        }
+    } else {
+        appLabelState
+    }
 
     val layoutDirection = if (selectedLang == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
 
@@ -1020,9 +1043,9 @@ fun SetupScreen(
 @Composable
 fun SelectedBadge(app: DeviceAppInfo, onRemove: () -> Unit) {
     val context = LocalContext.current
-    val isStealthActive = remember { LockSettings.isStealthModeEnabled(context) }
-    val displayLabel = if (isStealthActive) "Blocked" else app.label
-    val displayColor = if (isStealthActive) Color(0xFF64748B) else app.color
+    // Inside the app itself, we always display the true labels, colors and icons to make configuring simple and clear.
+    val displayLabel = app.label
+    val displayColor = app.color
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -1040,7 +1063,7 @@ fun SelectedBadge(app: DeviceAppInfo, onRemove: () -> Unit) {
                 .clip(CircleShape),
             fallbackLabel = displayLabel,
             fallbackColor = displayColor,
-            isStealthMode = isStealthActive,
+            isStealthMode = false,
             textStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold)
         )
         Spacer(modifier = Modifier.width(6.dp))
@@ -1333,12 +1356,9 @@ fun AppSelectionRow(
     isChecked: Boolean,
     onToggle: () -> Unit
 ) {
-    val context = LocalContext.current
-    val isStealthActive = remember { LockSettings.isStealthModeEnabled(context) }
-    
-    val showAsStealth = isChecked && isStealthActive
-    val displayLabel = if (showAsStealth) "Blocked" else app.label
-    val displayColor = if (showAsStealth) Color(0xFF64748B) else app.color
+    // Inside the app, we always display the true labels, colors and icons to make selection and management clear.
+    val displayLabel = app.label
+    val displayColor = app.color
 
     Row(
         modifier = Modifier
@@ -1357,14 +1377,14 @@ fun AppSelectionRow(
                     .clip(CircleShape),
                 fallbackLabel = displayLabel,
                 fallbackColor = displayColor,
-                isStealthMode = showAsStealth
+                isStealthMode = false
             )
             Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = displayLabel,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = if (showAsStealth) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
         Checkbox(
@@ -1903,7 +1923,57 @@ fun TimeDrumColumn(
     val selectedLang = remember { LockSettings.getSelectedLanguage(context) }
     val displayLabel = if (selectedLang == "ar") labelArabic else labelEnglish
 
-    var dragAccumulator by remember { mutableStateOf(0f) }
+    val rangeCount = range.last - range.first + 1
+    // Infinite multiplier base to allow circular wrapping
+    val baseMultiplier = 1000
+    val totalItems = baseMultiplier * rangeCount
+
+    val listState = rememberLazyListState()
+    val density = LocalDensity.current
+    val itemHeightDp = 44.dp
+    val itemHeightPx = itemHeightDp.value * density.density
+
+    // Initialize list to center on the current value
+    LaunchedEffect(Unit) {
+        val initialCenterIndex = (baseMultiplier / 2) * rangeCount + (value - range.first)
+        listState.scrollToItem(initialCenterIndex - 1, 0)
+    }
+
+    // Sync programmatically from external changes (Presets / Resets) when NOT scrolling
+    LaunchedEffect(value) {
+        if (!listState.isScrollInProgress) {
+            val currentCenter = listState.firstVisibleItemIndex + 1
+            val currentCenterValInDomain = (currentCenter % rangeCount) + range.first
+            if (value != currentCenterValInDomain) {
+                val diff = value - currentCenterValInDomain
+                var shortDiff = diff % rangeCount
+                if (shortDiff > rangeCount / 2) shortDiff -= rangeCount
+                if (shortDiff < -rangeCount / 2) shortDiff += rangeCount
+
+                val targetCenter = currentCenter + shortDiff
+                listState.animateScrollToItem(targetCenter - 1, 0)
+            }
+        }
+    }
+
+    // Capture the snap target when user finishes dragging/flinging
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) {
+            val firstVisibleIndex = listState.firstVisibleItemIndex
+            val scrollOffset = listState.firstVisibleItemScrollOffset
+            
+            val snapIndex = if (scrollOffset.toFloat() > itemHeightPx / 2f) {
+                firstVisibleIndex + 1
+            } else {
+                firstVisibleIndex
+            }
+            listState.animateScrollToItem(snapIndex, 0)
+            
+            val selectedIndex = (snapIndex + 1) % rangeCount
+            val newValue = range.first + selectedIndex
+            onValueChange(newValue)
+        }
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1911,7 +1981,7 @@ fun TimeDrumColumn(
     ) {
         Box(
             modifier = Modifier
-                .size(width = 68.dp, height = 110.dp)
+                .size(width = 68.dp, height = 132.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(
                     if (isDarkTheme) Color(0xFF1E293B).copy(alpha = 0.8f) else Color(0xFFE2E8F0).copy(alpha = 0.6f)
@@ -1920,66 +1990,66 @@ fun TimeDrumColumn(
                     width = 1.5.dp,
                     color = if (isDarkTheme) Color(0xFF6366F1).copy(alpha = 0.4f) else Color(0xFF818CF8).copy(alpha = 0.5f),
                     shape = RoundedCornerShape(20.dp)
-                )
-                .pointerInput(value) {
-                    detectVerticalDragGestures(
-                        onDragEnd = { dragAccumulator = 0f },
-                        onDragCancel = { dragAccumulator = 0f },
-                        onVerticalDrag = { change, dragAmount ->
-                            change.consume()
-                            dragAccumulator += dragAmount
-                            // Smooth threshold: 36 pixels of swipe triggers incremental change
-                            val threshold = 36f
-                            if (dragAccumulator >= threshold) {
-                                val prevVal = if (value <= range.first) range.last else value - 1
-                                onValueChange(prevVal)
-                                dragAccumulator = 0f
-                            } else if (dragAccumulator <= -threshold) {
-                                val nextVal = if (value >= range.last) range.first else value + 1
-                                onValueChange(nextVal)
-                                dragAccumulator = 0f
-                            }
-                        }
-                    )
-                },
+                ),
             contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            // Highlights Central Focus area
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(itemHeightDp)
+                    .background(Color(0xFF6366F1).copy(alpha = 0.08f))
+            )
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .size(width = 68.dp, height = 132.dp),
+                contentPadding = PaddingValues(0.dp)
             ) {
-                // Ghost number (top fading)
-                val prevVal = if (value <= range.first) range.last else value - 1
-                Text(
-                    text = String.format("%02d", prevVal),
-                    color = (if (isDarkTheme) Color.White else Color(0xFF0F172A)).copy(alpha = 0.2f),
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                    modifier = Modifier.scale(0.85f)
-                )
-                
-                Spacer(modifier = Modifier.height(6.dp))
-                
-                // Active primary number in display scale
-                Text(
-                    text = String.format("%02d", value),
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                    ),
-                    color = if (isDarkTheme) Color(0xFF818CF8) else Color(0xFF6366F1)
-                )
+                items(totalItems) { index ->
+                    val indexInDomain = index % rangeCount
+                    val displayValue = range.first + indexInDomain
 
-                Spacer(modifier = Modifier.height(6.dp))
+                    val firstVisibleIndex = listState.firstVisibleItemIndex
+                    val firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset
+                    
+                    val relativePos = index - firstVisibleIndex - (firstVisibleItemScrollOffset.toFloat() / itemHeightPx)
+                    val distance = if (relativePos > 1.0f) relativePos - 1.0f else 1.0f - relativePos
 
-                // Ghost number (bottom fading)
-                val nextVal = if (value >= range.last) range.first else value + 1
-                Text(
-                    text = String.format("%02d", nextVal),
-                    color = (if (isDarkTheme) Color.White else Color(0xFF0F172A)).copy(alpha = 0.2f),
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                    modifier = Modifier.scale(0.85f)
-                )
+                    // 3D Cylinder roll projection metrics
+                    val scale = (1.25f - (distance * 0.35f)).coerceIn(0.7f, 1.25f)
+                    val alpha = (1.0f - (distance * 0.65f)).coerceIn(0.15f, 1.0f)
+                    val rotationX = (relativePos - 1.0f) * -35f
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(itemHeightDp)
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                this.alpha = alpha
+                                this.rotationX = rotationX
+                                cameraDistance = 8f * density.density
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = String.format("%02d", displayValue),
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            ),
+                            color = if (isDarkTheme) {
+                                if (distance < 0.5f) Color(0xFF818CF8) else Color.White
+                            } else {
+                                if (distance < 0.5f) Color(0xFF6366F1) else Color(0xFF0F172A)
+                            }
+                        )
+                    }
+                }
             }
         }
         
@@ -2464,6 +2534,11 @@ fun LockdownScreen(
     val isStealthActive = remember { LockSettings.isStealthModeEnabled(context) }
     var timeLeft by remember { mutableIntStateOf(durationSecs) }
     
+    // Intercept back click so they cannot exit ZenLock during lockdown
+    BackHandler(enabled = true) {
+        // Do nothing or show a custom message, preventing back out
+    }
+    
     LaunchedEffect(Unit) {
         while (timeLeft > 0) {
             delay(1000)
@@ -2648,9 +2723,9 @@ fun LockdownScreen(
                                 modifier = Modifier
                                     .size(28.dp)
                                     .clip(CircleShape),
-                                fallbackLabel = if (isStealthActive) "Blocked" else app.label,
-                                fallbackColor = if (isStealthActive) Color(0xFF64748B) else app.color,
-                                isStealthMode = isStealthActive,
+                                fallbackLabel = app.label,
+                                fallbackColor = app.color,
+                                isStealthMode = false,
                                 textStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Black)
                             )
                         }
