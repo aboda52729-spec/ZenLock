@@ -530,8 +530,8 @@ fun ZenLockApp(
                 SetupScreen(
                     isDarkTheme = isDarkTheme,
                     onToggleTheme = onToggleTheme,
-                    durationMins = lockdownDurationSecs / 60,
-                    onDurationChange = { lockdownDurationSecs = it * 60 },
+                    durationSecs = lockdownDurationSecs,
+                    onDurationChange = { lockdownDurationSecs = it },
                     selectedApps = selectedApps,
                     installedApps = installedApps,
                     isShieldActive = isShieldActive,
@@ -566,7 +566,7 @@ fun ZenLockApp(
 fun SetupScreen(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
-    durationMins: Int,
+    durationSecs: Int,
     onDurationChange: (Int) -> Unit,
     selectedApps: Set<String>,
     installedApps: List<DeviceAppInfo>,
@@ -788,7 +788,7 @@ fun SetupScreen(
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            DurationSelector(isDarkTheme, durationMins, onDurationChange)
+            DurationSelector(isDarkTheme, durationSecs, onDurationChange)
             
             Spacer(modifier = Modifier.height(32.dp))
             
@@ -1284,14 +1284,44 @@ fun ThemeToggleButton(isDarkTheme: Boolean, onToggleTheme: () -> Unit) {
 }
 
 @Composable
-fun DurationSelector(isDarkTheme: Boolean, durationMins: Int, onDurationChange: (Int) -> Unit) {
+fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: (Int) -> Unit) {
+    val context = LocalContext.current
+    var presets by remember { mutableStateOf(LockSettings.getSavedPresets(context)) }
+    
+    val hours = durationSecs / 3600
+    val minutes = (durationSecs % 3600) / 60
+    val seconds = durationSecs % 60
+    
+    var showAddPresetDialog by remember { mutableStateOf(false) }
+    var newPresetName by remember { mutableStateOf("") }
+    
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(if (isDarkTheme) Color.White.copy(alpha = 0.04f) else Color(0xFFF1F5F9))
-            .border(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color(0xFFE2E8F0), RoundedCornerShape(28.dp))
-            .padding(20.dp)
+            .clip(RoundedCornerShape(32.dp))
+            .background(
+                if (isDarkTheme) {
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF1E293B).copy(alpha = 0.5f),
+                            Color(0xFF0F172A).copy(alpha = 0.5f)
+                        )
+                    )
+                } else {
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFFFFFFFF).copy(alpha = 0.9f),
+                            Color(0xFFF1F5F9).copy(alpha = 0.9f)
+                        )
+                    )
+                }
+            )
+            .border(
+                1.dp,
+                if (isDarkTheme) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0),
+                RoundedCornerShape(32.dp)
+            )
+            .padding(24.dp)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1302,81 +1332,764 @@ fun DurationSelector(isDarkTheme: Boolean, durationMins: Int, onDurationChange: 
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Focus Duration",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                
-                val adviceText = when {
-                    durationMins <= 15 -> "Quick Burst"
-                    durationMins <= 30 -> "Pomodoro"
-                    durationMins <= 60 -> "Deep Focus"
-                    else -> "Extreme Focus"
+                Column {
+                    Text(
+                        text = "مؤقت احترافي",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                        color = if (isDarkTheme) Color.White else Color(0xFF0F172A)
+                    )
+                    Text(
+                        text = "حدد وقت الجلسة السريعة أو المخصصة بدقة بالغة",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isDarkTheme) Color(0xFF818CF8) else Color(0xFF6366F1)
+                    )
                 }
-                Text(
-                    text = adviceText,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                
+                Icon(
+                    imageVector = Icons.Filled.Timer,
+                    contentDescription = null,
+                    tint = Color(0xFF6366F1),
+                    modifier = Modifier.size(28.dp)
                 )
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(84.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                if (isDarkTheme) {
+                                    listOf(Color(0xFF6366F1).copy(alpha = 0.08f), Color(0xFF818CF8).copy(alpha = 0.02f))
+                                } else {
+                                    listOf(Color(0xFF6366F1).copy(alpha = 0.05f), Color.Transparent)
+                                }
+                            )
+                        )
+                        .border(
+                            1.dp,
+                            if (isDarkTheme) Color(0xFF818CF8).copy(alpha = 0.3f) else Color(0xFF6366F1).copy(alpha = 0.2f),
+                            RoundedCornerShape(16.dp)
+                        )
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TimeDrumColumn(
+                        value = hours,
+                        labelArabic = "ساعات",
+                        labelEnglish = "HOURS",
+                        range = 0..23,
+                        isDarkTheme = isDarkTheme,
+                        onValueChange = { newH ->
+                            onDurationChange(newH * 3600 + minutes * 60 + seconds)
+                        }
+                    )
+                    
+                    Text(
+                        text = ":",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+                        color = Color(0xFF6366F1),
+                        modifier = Modifier.padding(bottom = 24.dp)
+                    )
+
+                    TimeDrumColumn(
+                        value = minutes,
+                        labelArabic = "دقائق",
+                        labelEnglish = "MINUTES",
+                        range = 0..59,
+                        isDarkTheme = isDarkTheme,
+                        onValueChange = { newM ->
+                            onDurationChange(hours * 3600 + newM * 60 + seconds)
+                        }
+                    )
+                    
+                    Text(
+                        text = ":",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+                        color = Color(0xFF6366F1),
+                        modifier = Modifier.padding(bottom = 24.dp)
+                    )
+
+                    TimeDrumColumn(
+                        value = seconds,
+                        labelArabic = "ثواني",
+                        labelEnglish = "SECONDS",
+                        range = 0..59,
+                        isDarkTheme = isDarkTheme,
+                        onValueChange = { newS ->
+                            onDurationChange(hours * 3600 + minutes * 60 + newS)
+                        }
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { showAddPresetDialog = true },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color(0xFFF1F5F9),
+                        contentColor = if (isDarkTheme) Color.White else Color(0xFF475569)
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color(0xFFE2E8F0))
+                ) {
+                    Icon(imageVector = Icons.Filled.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "حفظ كإعداد مسبق", style = MaterialTheme.typography.labelMedium)
+                }
+                
+                Button(
+                    onClick = {
+                        onDurationChange(25 * 60)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF6366F1).copy(alpha = 0.15f),
+                        contentColor = Color(0xFF6366F1)
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(imageVector = Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "إعادة ضبط (٢٥د)", style = MaterialTheme.typography.labelMedium)
+                }
             }
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
+            Text(
+                text = "المفضلات المخزنة والافتراضية:",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF64748B),
+                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
+            )
+            
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "$durationMins",
-                    style = MaterialTheme.typography.displayMedium.copy(
-                        fontSize = 44.sp,
-                        fontWeight = FontWeight.Black
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "minutes",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                presets.forEachIndexed { idx, pair ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(
+                                if (durationSecs == pair.second) {
+                                    Color(0xFF6366F1).copy(alpha = 0.2f)
+                                } else {
+                                    if (isDarkTheme) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.03f)
+                                }
+                            )
+                            .border(
+                                1.dp,
+                                if (durationSecs == pair.second) Color(0xFF818CF8) else (if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color(0xFFE2E8F0)),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .clickable {
+                                onDurationChange(pair.second)
+                            }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = pair.first,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = if (durationSecs == pair.second) Color(0xFF818CF8) else (if (isDarkTheme) Color.White else Color(0xFF1E293B))
+                            )
+                            if (idx >= 4) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = "Delete Preset",
+                                    tint = Color.Red.copy(alpha = 0.7f),
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .clickable {
+                                            LockSettings.deletePreset(context, idx)
+                                            presets = LockSettings.getSavedPresets(context)
+                                        }
+                                )
+                            }
+                        }
+                    }
+                }
             }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Slider(
-                value = durationMins.toFloat(),
-                onValueChange = { onDurationChange(it.toInt()) },
-                valueRange = 5f..120f,
-                steps = 22,
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                    inactiveTrackColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.12f),
-                    activeTickColor = Color.Transparent,
-                    inactiveTickColor = Color.Transparent
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Locks selected distracting apps completely until the timer expires.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+        }
+    }
+    
+    if (showAddPresetDialog) {
+        Dialog(onDismissRequest = { showAddPresetDialog = false }) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(if (isDarkTheme) Color(0xFF1E293B) else Color.White)
+                    .border(1.dp, Color(0xFF6366F1).copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                    .padding(24.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "حفظ كإعداد مسبق مخصص",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = if (isDarkTheme) Color.White else Color(0xFF0F172A),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "سيتم حفظ الوقت الحالي (${hours}س و ${minutes}د و ${seconds}ث) للوصول السريع مستقبلاً.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = newPresetName,
+                        onValueChange = { newPresetName = it },
+                        label = { Text("اسم الإعداد المسبق") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF6366F1),
+                            unfocusedBorderColor = if (isDarkTheme) Color.White.copy(alpha = 0.15f) else Color(0xFFCBD5E1)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { showAddPresetDialog = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = if (isDarkTheme) Color.White else Color(0xFF475569)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("إلغاء")
+                        }
+                        
+                        Button(
+                            onClick = {
+                                val finalizedName = newPresetName.trim().ifEmpty { "مؤقت ${hours}س:${minutes}د" }
+                                LockSettings.savePreset(context, finalizedName, durationSecs)
+                                presets = LockSettings.getSavedPresets(context)
+                                newPresetName = ""
+                                showAddPresetDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                            modifier = Modifier.weight(1.5f)
+                        ) {
+                            Text("حفظ الآن", color = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TimeDrumColumn(
+    value: Int,
+    labelArabic: String,
+    labelEnglish: String,
+    range: IntRange,
+    isDarkTheme: Boolean,
+    onValueChange: (Int) -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(64.dp)
+    ) {
+        IconButton(
+            onClick = {
+                val nextVal = if (value >= range.last) range.first else value + 1
+                onValueChange(nextVal)
+            },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.KeyboardArrowUp,
+                contentDescription = "Increase",
+                tint = Color(0xFF6366F1),
+                modifier = Modifier.size(24.dp)
             )
         }
+        
+        Box(
+            modifier = Modifier
+                .size(width = 64.dp, height = 56.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (isDarkTheme) Color.Black.copy(alpha = 0.3f) else Color(0xFFF8FAFC))
+                .border(
+                    1.dp,
+                    if (isDarkTheme) Color.White.copy(alpha = 0.12f) else Color(0xFFCBD5E1),
+                    RoundedCornerShape(12.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = String.format("%02d", value),
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                ),
+                color = if (isDarkTheme) Color.White else Color(0xFF0F172A)
+            )
+        }
+        
+        IconButton(
+            onClick = {
+                val nextVal = if (value <= range.first) range.last else value - 1
+                onValueChange(nextVal)
+            },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.KeyboardArrowDown,
+                contentDescription = "Decrease",
+                tint = Color(0xFF6366F1),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        Text(
+            text = labelArabic,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+            color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569)
+        )
+        Text(
+            text = labelEnglish,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+            color = if (isDarkTheme) Color.White.copy(alpha = 0.3f) else Color(0xFF94A3B8)
+        )
+    }
+}
+
+@Composable
+fun ChallengeUnlockDialog(
+    isDarkTheme: Boolean,
+    onSuccess: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var stage by remember { mutableIntStateOf(1) }
+
+    val mathQuiz = remember {
+        val first = (5..12).random()
+        val second = (3..8).random()
+        val third = (4..15).random()
+        val isAddition = listOf(true, false).random()
+        val answer = if (isAddition) (first * second) + third else (first * second) - third
+        Triple("$first × $second ${if (isAddition) "+" else "-"} $third", answer, "احسب الناتج لتفعيل عقلك العقلاني")
+    }
+    var mathInput by remember { mutableStateOf("") }
+    var mathError by remember { mutableStateOf(false) }
+
+    val targetQuote = "أنا سيد فكري وقراري ولن أدع اللحظات الضعيفة تشتت مستقبلي المشرق"
+    var quoteInput by remember { mutableStateOf("") }
+    var quoteError by remember { mutableStateOf(false) }
+
+    var holdProgress by remember { mutableFloatStateOf(0f) }
+    var isHolding by remember { mutableStateOf(false) }
+    
+    val currentHoldMilli = 8000L
+    LaunchedEffect(isHolding) {
+        if (isHolding) {
+            val startTime = System.currentTimeMillis()
+            while (holdProgress < 1f && isHolding) {
+                delay(30)
+                val elapsed = System.currentTimeMillis() - startTime
+                holdProgress = minOf(1f, elapsed.toFloat() / currentHoldMilli)
+            }
+            if (holdProgress >= 1f) {
+                onSuccess()
+            }
+        } else {
+            while (holdProgress > 0f && !isHolding) {
+                delay(16)
+                holdProgress -= 0.04f
+                if (holdProgress < 0f) holdProgress = 0f
+            }
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(32.dp))
+                .background(if (isDarkTheme) Color(0xFF0F0F12) else Color.White)
+                .border(2.dp, Brush.sweepGradient(listOf(Color(0xFFEF4444), Color(0xFF6366F1), Color(0xFFEF4444))), RoundedCornerShape(32.dp))
+                .padding(24.dp)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = Color(0xFFEF4444),
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "حاجز الوعي ضد التشتت",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                    color = if (isDarkTheme) Color.White else Color(0xFF0F172A),
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "لأنك قررت عزل التطبيقات بوعيك التام، فلن يدعك ZenLock تنهي الجلسة إلا بعد برهنة تحكمك وانتباهك العقلي التام.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF64748B),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ChallengeStepCircle(step = 1, currentStep = stage, text = "العقل المنطقي")
+                    Box(modifier = Modifier.width(24.dp).height(2.dp).background(if (stage > 1) Color(0xFF10B981) else Color.Gray.copy(alpha = 0.3f)))
+                    ChallengeStepCircle(step = 2, currentStep = stage, text = "تأكيد الإرادة")
+                    Box(modifier = Modifier.width(24.dp).height(2.dp).background(if (stage > 2) Color(0xFF10B981) else Color.Gray.copy(alpha = 0.3f)))
+                    ChallengeStepCircle(step = 3, currentStep = stage, text = "التنفس الواعي")
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                when (stage) {
+                    1 -> {
+                        Text(
+                            text = "للتأكد من نشاط الفص الجبهي المسؤول عن الانتباه، احسب الإجابة التالية:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(64.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isDarkTheme) Color.White.copy(alpha = 0.05f) else Color(0xFFF1F5F9))
+                                .border(1.dp, Color(0xFF6366F1).copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = mathQuiz.first,
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+                                color = if (isDarkTheme) Color.White else Color(0xFF0F172A)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedTextField(
+                            value = mathInput,
+                            onValueChange = {
+                                mathInput = it
+                                mathError = false
+                            },
+                            label = { Text("أدخل إجابتك الرياضية") },
+                            isError = mathError,
+                            singleLine = true,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF6366F1),
+                                errorBorderColor = Color(0xFFEF4444)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        if (mathError) {
+                            Text(
+                                text = "الناتج غير صحيح. خذ وقتك للتفكير واكتب بدقة.",
+                                color = Color(0xFFEF4444),
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Button(
+                            onClick = {
+                                val entered = mathInput.trim().toIntOrNull()
+                                if (entered == mathQuiz.second) {
+                                    stage = 2
+                                } else {
+                                    mathError = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text("تأكيد وحل اللغز", color = Color.White)
+                        }
+                    }
+                    2 -> {
+                        Text(
+                            text = "اكتب العبارة بدقة متناهية ودون أخطاء لكبح شهوة الفتح التلقائية:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFF6366F1).copy(alpha = 0.08f))
+                                .border(1.dp, Color(0xFF6366F1).copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = targetQuote,
+                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp, fontWeight = FontWeight.Bold),
+                                color = if (isDarkTheme) Color(0xFF818CF8) else Color(0xFF4F46E5),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedTextField(
+                            value = quoteInput,
+                            onValueChange = {
+                                quoteInput = it
+                                quoteError = false
+                            },
+                            label = { Text("اكتب العبارة حرفيًا هنا") },
+                            isError = quoteError,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF6366F1),
+                                errorBorderColor = Color(0xFFEF4444)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        if (quoteError) {
+                            Text(
+                                text = "العبارة غير متطابقة. يرجى كتابتها بدقة متناهية.",
+                                color = Color(0xFFEF4444),
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Button(
+                            onClick = {
+                                if (quoteInput.trim() == targetQuote) {
+                                    stage = 3
+                                } else {
+                                    quoteError = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text("تأكيد القسم والتالي", color = Color.White)
+                        }
+                    }
+                    3 -> {
+                        val instructionsText = when {
+                            holdProgress <= 0.25f -> "خذ شهيقاً عميقاً وصافياً..."
+                            holdProgress <= 0.5f  -> "احبس أنفاسك واشعر بقوتك الذاتية..."
+                            holdProgress <= 0.75f -> "أخرج زفير الضعف والتشتت من صدرك..."
+                            else                  -> "أنت الآن واعي وتتحكم بعقلك بالكامل..."
+                        }
+
+                        Text(
+                            text = instructionsText,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color(0xFF10B981),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.height(24.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .size(140.dp)
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onPress = {
+                                            isHolding = true
+                                            tryAwaitRelease()
+                                            isHolding = false
+                                        }
+                                    )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val strokeWidth = 8.dp.toPx()
+                                drawArc(
+                                    color = if (isDarkTheme) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.06f),
+                                    startAngle = 0f,
+                                    sweepAngle = 360f,
+                                    useCenter = false,
+                                    style = Stroke(width = strokeWidth)
+                                )
+                                if (holdProgress > 0f) {
+                                    drawArc(
+                                        color = Color(0xFF10B981),
+                                        startAngle = -90f,
+                                        sweepAngle = 360f * holdProgress,
+                                        useCenter = false,
+                                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(100.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.radialGradient(
+                                            if (isHolding) {
+                                                listOf(Color(0xFF10B981).copy(alpha = 0.3f), Color(0xFF10B981).copy(alpha = 0.05f))
+                                            } else {
+                                                listOf(Color(0xFFEF4444).copy(alpha = 0.2f), Color.Transparent)
+                                            }
+                                        )
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isHolding) Color(0xFF10B981) else Color(0xFFEF4444).copy(alpha = 0.5f),
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Fingerprint,
+                                        contentDescription = "Hold fingerprint to breathe",
+                                        tint = if (isHolding) Color(0xFF10B981) else Color(0xFFEF4444),
+                                        modifier = Modifier.size(44.dp)
+                                    )
+                                    Text(
+                                        text = "${(8 - (holdProgress * 8).toInt())}ث",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = if (isHolding) Color(0xFF10B981) else Color(0xFFEF4444)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = "ضع إصبعك واستمر بالضغط لـ ٨ ثواني متواصلة.\n(إذا تركت سيعيد المؤشر من البداية لتسهيل الهدوء والتنفس المستقر)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                OutlinedButton(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = if (isDarkTheme) Color.White.copy(alpha = 0.6f) else Color(0xFF475569)
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    Text("إلغاء والتراجع عن كسر التركيز", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChallengeStepCircle(step: Int, currentStep: Int, text: String) {
+    val isPassed = currentStep > step
+    val isActive = currentStep == step
+    
+    val color = when {
+        isPassed -> Color(0xFF10B981)
+        isActive -> Color(0xFF6366F1)
+        else     -> Color.Gray.copy(alpha = 0.3f)
+    }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(color),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isPassed) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            } else {
+                Text(
+                    text = "$step",
+                    style = MaterialTheme.typography.labelLarge.copy(color = Color.White, fontWeight = FontWeight.Bold)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.SemiBold),
+            color = color
+        )
     }
 }
 
@@ -1455,6 +2168,7 @@ fun LockdownScreen(
             delay(1000)
             timeLeft--
         }
+        onUnlock()
     }
 
     val mins = timeLeft / 60
@@ -1659,9 +2373,57 @@ fun LockdownScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(36.dp))
 
-            EmergencyUnlockButton(onUnlock)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        if (isDarkTheme) Color(0xFFEF4444).copy(alpha = 0.08f)
+                        else Color(0xFFFEF2F2)
+                    )
+                    .border(
+                        width = 1.5.dp,
+                        color = if (isDarkTheme) Color(0xFFEF4444).copy(alpha = 0.25f) else Color(0xFFFCA5A5),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                    .padding(20.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFEF4444).copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = "Strict Mode Active",
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "تم تفعيل القفل الصارم بنجاح",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = if (isDarkTheme) Color.White else Color(0xFF991B1B)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "لا توجد ثغرات أو مهرب. الجلسة مغلقة تماماً حتى ينتهي العداد لضمان انضباطك المطلق.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isDarkTheme) Color(0xFFFCA5A5) else Color(0xFF7F1D1D)
+                        )
+                    }
+                }
+            }
         }
     }
 }

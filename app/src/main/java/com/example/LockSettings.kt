@@ -75,4 +75,50 @@ object LockSettings {
         val blocked = getBlockedApps(context)
         return blocked.contains(packageName)
     }
+
+    fun getSavedPresets(context: Context): List<Pair<String, Int>> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val saved = prefs.getString("custom_presets_v2", null)
+        if (saved == null) {
+            return listOf(
+                Pair("بومودورو (25د)", 25 * 60),
+                Pair("تركيز عميق (1س)", 60 * 60),
+                Pair("فحص تركيز (10ث)", 10),
+                Pair("انطلاقة (5د)", 5 * 60)
+            )
+        }
+        return try {
+            saved.split(";").filter { it.isNotEmpty() }.map {
+                val parts = it.split(",")
+                Pair(parts[0], parts[1].toInt())
+            }
+        } catch(e: Exception) {
+            listOf(
+                Pair("بومودورو (25د)", 25 * 60),
+                Pair("تركيز عميق (1س)", 60 * 60),
+                Pair("فحص تركيز (10ث)", 10),
+                Pair("انطلاقة (5د)", 5 * 60)
+            )
+        }
+    }
+
+    fun savePreset(context: Context, name: String, durationSecs: Int) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val current = getSavedPresets(context).toMutableList()
+        if (current.none { it.second == durationSecs }) {
+            current.add(Pair(name, durationSecs))
+            val serialized = current.joinToString(";") { "${it.first},${it.second}" }
+            prefs.edit().putString("custom_presets_v2", serialized).apply()
+        }
+    }
+
+    fun deletePreset(context: Context, index: Int) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val current = getSavedPresets(context).toMutableList()
+        if (index >= 0 && index < current.size) {
+            current.removeAt(index)
+            val serialized = current.joinToString(";") { "${it.first},${it.second}" }
+            prefs.edit().putString("custom_presets_v2", serialized).apply()
+        }
+    }
 }
