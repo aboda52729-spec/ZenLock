@@ -145,53 +145,69 @@ fun AppIcon(
     modifier: Modifier = Modifier,
     fallbackLabel: String,
     fallbackColor: Color,
+    isStealthMode: Boolean = false,
     textStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleMedium
 ) {
-    val context = LocalContext.current
-    var bitmapState by remember(packageName) { mutableStateOf<ImageBitmap?>(AppIconCache.get(packageName)) }
+    if (isStealthMode) {
+        Box(
+            modifier = modifier
+                .background(Color(0xFF475569).copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Lock,
+                contentDescription = "Hidden",
+                tint = Color(0xFF64748B),
+                modifier = Modifier.fillMaxSize(0.6f)
+            )
+        }
+    } else {
+        val context = LocalContext.current
+        var bitmapState by remember(packageName) { mutableStateOf<ImageBitmap?>(AppIconCache.get(packageName)) }
 
-    if (bitmapState == null) {
-        LaunchedEffect(packageName) {
-            val cached = AppIconCache.get(packageName)
-            if (cached != null) {
-                bitmapState = cached
-            } else {
-                val b = withContext(Dispatchers.IO) {
-                    try {
-                        val pm = context.packageManager
-                        val drawable = pm.getApplicationIcon(packageName)
-                        drawable.toBitmap(width = 100, height = 100).asImageBitmap()
-                    } catch (e: Exception) {
-                        null
+        if (bitmapState == null) {
+            LaunchedEffect(packageName) {
+                val cached = AppIconCache.get(packageName)
+                if (cached != null) {
+                    bitmapState = cached
+                } else {
+                    val b = withContext(Dispatchers.IO) {
+                        try {
+                            val pm = context.packageManager
+                            val drawable = pm.getApplicationIcon(packageName)
+                            drawable.toBitmap(width = 100, height = 100).asImageBitmap()
+                        } catch (e: Exception) {
+                            null
+                        }
                     }
-                }
-                if (b != null) {
-                    AppIconCache.put(packageName, b)
-                    bitmapState = b
+                    if (b != null) {
+                        AppIconCache.put(packageName, b)
+                        bitmapState = b
+                    }
                 }
             }
         }
-    }
 
-    val appIcon = bitmapState
-    if (appIcon != null) {
-        Image(
-            bitmap = appIcon,
-            contentDescription = "$fallbackLabel icon",
-            modifier = modifier
-        )
-    } else {
-        Box(
-            modifier = modifier
-                .background(fallbackColor),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = fallbackLabel.firstOrNull()?.uppercase() ?: "",
-                style = textStyle,
-                color = Color.White,
-                fontWeight = FontWeight.Black
+        val appIcon = bitmapState
+        if (appIcon != null) {
+            Image(
+                bitmap = appIcon,
+                contentDescription = "$fallbackLabel icon",
+                modifier = modifier
             )
+        } else {
+            Box(
+                modifier = modifier
+                    .background(fallbackColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = fallbackLabel.firstOrNull()?.uppercase() ?: "",
+                    style = textStyle,
+                    color = Color.White,
+                    fontWeight = FontWeight.Black
+                )
+            }
         }
     }
 }
@@ -202,6 +218,7 @@ fun BlockedNotificationDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val isStealthActive = remember { LockSettings.isStealthModeEnabled(context) }
     var appLabelState by remember(packageName) { mutableStateOf(packageName) }
     LaunchedEffect(packageName) {
         val label = withContext(Dispatchers.IO) {
@@ -215,7 +232,7 @@ fun BlockedNotificationDialog(
         }
         appLabelState = label
     }
-    val appLabel = appLabelState
+    val appLabel = if (isStealthActive) "Blocked" else appLabelState
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -255,14 +272,15 @@ fun BlockedNotificationDialog(
                                     .clip(CircleShape)
                                     .border(2.dp, Color(0xFFEF4444).copy(alpha = 0.5f), CircleShape),
                                 fallbackLabel = appLabel,
-                                fallbackColor = Color(0xFFEF4444)
+                                fallbackColor = Color(0xFFEF4444),
+                                isStealthMode = isStealthActive
                             )
                         }
 
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Text(
-                            text = "الوصول مقيد الان",
+                            text = if (isStealthActive) "الوصول غير متاح" else "الوصول مقيد الان",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color(0xFFEF4444)
@@ -271,7 +289,11 @@ fun BlockedNotificationDialog(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Text(
-                            text = "تطبيق \"$appLabel\" يقع ضمن قائمة التطبيقات الممنوعة خلال جلسة التركيز الحالية. حافظ على إنتاجيتك واستمر في التركيز.",
+                            text = if (isStealthActive) {
+                                "تم إخفاء وعزل هذا التطبيق تماماً تحت وضع عدم الأثر لضمان عدم توفير أي مشتتات أو رغبة بصرية في فتحه. واصل التركيز!"
+                            } else {
+                                "تطبيق \"$appLabel\" يقع ضمن قائمة التطبيقات الممنوعة خلال جلسة التركيز الحالية. حافظ على إنتاجيتك واستمر في التركيز."
+                            },
                             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 24.sp),
                             color = Color(0xFFE2E8F0),
                             textAlign = TextAlign.Center
@@ -409,6 +431,7 @@ fun ZenLockApp(
     var isShieldActive by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
     var isStealthActive by remember { mutableStateOf(isNotificationServiceEnabled(context)) }
     var isDeviceAdminActive by remember { mutableStateOf(isDeviceAdminEnabled(context)) }
+    var isStealthModeOn by remember { mutableStateOf(LockSettings.isStealthModeEnabled(context)) }
 
     val allPermissionsGranted = isShieldActive && isStealthActive && isDeviceAdminActive
 
@@ -513,6 +536,11 @@ fun ZenLockApp(
                     installedApps = installedApps,
                     isShieldActive = isShieldActive,
                     isStealthActive = isStealthActive,
+                    isStealthModeOn = isStealthModeOn,
+                    onStealthModeToggle = { enabled ->
+                        LockSettings.setStealthModeEnabled(context, enabled)
+                        isStealthModeOn = enabled
+                    },
                     onAppToggle = { pkgName ->
                         selectedApps = if (selectedApps.contains(pkgName)) {
                             selectedApps - pkgName
@@ -544,6 +572,8 @@ fun SetupScreen(
     installedApps: List<DeviceAppInfo>,
     isShieldActive: Boolean,
     isStealthActive: Boolean,
+    isStealthModeOn: Boolean,
+    onStealthModeToggle: (Boolean) -> Unit,
     onAppToggle: (String) -> Unit,
     onStart: () -> Unit
 ) {
@@ -665,6 +695,98 @@ fun SetupScreen(
             }
             
             Spacer(modifier = Modifier.height(24.dp))
+
+            // Stealth Mode Card (No Trace Mode)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(
+                        if (isDarkTheme) {
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0xFF1E293B).copy(alpha = 0.4f),
+                                    Color(0xFF0F172A).copy(alpha = 0.4f)
+                                )
+                            )
+                        } else {
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0xFFF1F5F9).copy(alpha = 0.8f),
+                                    Color(0xFFE2E8F0).copy(alpha = 0.8f)
+                                )
+                            )
+                        }
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.horizontalGradient(
+                            if (isDarkTheme) {
+                                listOf(Color(0xFF818CF8).copy(alpha = 0.3f), Color(0xFF6366F1).copy(alpha = 0.05f))
+                            } else {
+                                listOf(Color(0xFF6366F1).copy(alpha = 0.2f), Color(0xFFE2E8F0).copy(alpha = 0.4f))
+                            }
+                        ),
+                        shape = RoundedCornerShape(32.dp)
+                    )
+                    .padding(24.dp)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDarkTheme) Color(0xFF6366F1).copy(alpha = 0.15f) else Color(0xFF6366F1).copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.VisibilityOff,
+                                    contentDescription = "Stealth Icon",
+                                    tint = Color(0xFF818CF8),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "ميزة عدم الأثر (Stealth)",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isDarkTheme) Color.White else Color(0xFF0F172A)
+                                )
+                                Text(
+                                    text = "وضع التخفي البصري والسرية الحصري",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF64748B)
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = isStealthModeOn,
+                            onCheckedChange = { onStealthModeToggle(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF6366F1),
+                                uncheckedThumbColor = if (isDarkTheme) Color(0xFF64748B) else Color(0xFF94A3B8),
+                                uncheckedTrackColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "عند تفعيل وضع عدم الأثر، يتم تحويل شارات وأيقونات البرامج المحجبة إلى شارة وإشارة غامضة باسم \"Blocked\" مع إخفاء رمز واسم التطبيقات الأصلي لمنع استثارة فضولك أو إعادة الرغبة البصرية في زيارتها.",
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+                        color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
             
             DurationSelector(isDarkTheme, durationMins, onDurationChange)
             
@@ -688,12 +810,17 @@ fun SetupScreen(
 
 @Composable
 fun SelectedBadge(app: DeviceAppInfo, onRemove: () -> Unit) {
+    val context = LocalContext.current
+    val isStealthActive = remember { LockSettings.isStealthModeEnabled(context) }
+    val displayLabel = if (isStealthActive) "Blocked" else app.label
+    val displayColor = if (isStealthActive) Color(0xFF64748B) else app.color
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(app.color.copy(alpha = 0.15f))
-            .border(1.dp, app.color.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .background(displayColor.copy(alpha = 0.15f))
+            .border(1.dp, displayColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
             .clickable { onRemove() }
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
@@ -702,22 +829,23 @@ fun SelectedBadge(app: DeviceAppInfo, onRemove: () -> Unit) {
             modifier = Modifier
                 .size(20.dp)
                 .clip(CircleShape),
-            fallbackLabel = app.label,
-            fallbackColor = app.color,
+            fallbackLabel = displayLabel,
+            fallbackColor = displayColor,
+            isStealthMode = isStealthActive,
             textStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold)
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
-            text = app.label,
+            text = displayLabel,
             style = MaterialTheme.typography.labelSmall,
-            color = app.color,
+            color = displayColor,
             fontWeight = FontWeight.Medium
         )
         Spacer(modifier = Modifier.width(4.dp))
         Icon(
             imageVector = Icons.Filled.Close,
             contentDescription = "Remove",
-            tint = app.color,
+            tint = displayColor,
             modifier = Modifier.size(12.dp)
         )
     }
@@ -996,6 +1124,13 @@ fun AppSelectionRow(
     isChecked: Boolean,
     onToggle: () -> Unit
 ) {
+    val context = LocalContext.current
+    val isStealthActive = remember { LockSettings.isStealthModeEnabled(context) }
+    
+    val showAsStealth = isChecked && isStealthActive
+    val displayLabel = if (showAsStealth) "Blocked" else app.label
+    val displayColor = if (showAsStealth) Color(0xFF64748B) else app.color
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1011,15 +1146,16 @@ fun AppSelectionRow(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape),
-                fallbackLabel = app.label,
-                fallbackColor = app.color
+                fallbackLabel = displayLabel,
+                fallbackColor = displayColor,
+                isStealthMode = showAsStealth
             )
             Spacer(modifier = Modifier.width(16.dp))
             Text(
-                text = app.label,
+                text = displayLabel,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = if (showAsStealth) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurface
             )
         }
         Checkbox(
@@ -1310,6 +1446,8 @@ fun LockdownScreen(
     installedApps: List<DeviceAppInfo>,
     onUnlock: () -> Unit
 ) {
+    val context = LocalContext.current
+    val isStealthActive = remember { LockSettings.isStealthModeEnabled(context) }
     var timeLeft by remember { mutableIntStateOf(durationSecs) }
     
     LaunchedEffect(Unit) {
@@ -1495,8 +1633,9 @@ fun LockdownScreen(
                                 modifier = Modifier
                                     .size(28.dp)
                                     .clip(CircleShape),
-                                fallbackLabel = app.label,
-                                fallbackColor = app.color,
+                                fallbackLabel = if (isStealthActive) "Blocked" else app.label,
+                                fallbackColor = if (isStealthActive) Color(0xFF64748B) else app.color,
+                                isStealthMode = isStealthActive,
                                 textStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Black)
                             )
                         }

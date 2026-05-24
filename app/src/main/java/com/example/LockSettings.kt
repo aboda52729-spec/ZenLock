@@ -8,6 +8,17 @@ object LockSettings {
     private const val PREFS_NAME = "zenlock_prefs"
     private const val KEY_BLOCKED_APPS = "blocked_apps"
     private const val KEY_LOCKDOWN_END = "lockdown_end"
+    private const val KEY_STEALTH_MODE_ENABLED = "stealth_mode_enabled"
+
+    fun isStealthModeEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_STEALTH_MODE_ENABLED, false)
+    }
+
+    fun setStealthModeEnabled(context: Context, enabled: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_STEALTH_MODE_ENABLED, enabled).apply()
+    }
 
     fun isLockdownActive(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
