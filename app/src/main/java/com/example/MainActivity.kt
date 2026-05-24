@@ -227,63 +227,75 @@ fun BlockedNotificationDialog(
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                tonalElevation = 6.dp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f), RoundedCornerShape(24.dp))
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = Color(0xFF0F0F12),
+                    tonalElevation = 12.dp,
+                    shadowElevation = 24.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f), RoundedCornerShape(28.dp))
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFEF4444).copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        modifier = Modifier.padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        AppIcon(
-                            packageName = packageName,
+                        Box(
                             modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape),
-                            fallbackLabel = appLabel,
-                            fallbackColor = Color(0xFFEF4444)
+                                .size(80.dp)
+                                .clip(CircleShape)
+                                .background(Brush.radialGradient(listOf(Color(0xFFEF4444).copy(alpha = 0.2f), Color.Transparent))),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AppIcon(
+                                packageName = packageName,
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .border(2.dp, Color(0xFFEF4444).copy(alpha = 0.5f), CircleShape),
+                                fallbackLabel = appLabel,
+                                fallbackColor = Color(0xFFEF4444)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Text(
+                            text = "الوصول مقيد الان",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFFEF4444)
                         )
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                    Text(
-                        text = "ZenLock Shield Active",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFEF4444)
-                    )
+                        Text(
+                            text = "تطبيق \"$appLabel\" يقع ضمن قائمة التطبيقات الممنوعة خلال جلسة التركيز الحالية. حافظ على إنتاجيتك واستمر في التركيز.",
+                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 24.sp),
+                            color = Color(0xFFE2E8F0),
+                            textAlign = TextAlign.Center
+                        )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(28.dp))
 
-                    Text(
-                        text = "\"$appLabel\" is currently blocked under your active focus session.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Button(
-                        onClick = onDismiss,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFEF4444)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Keep Focusing", color = Color.White)
+                        Button(
+                            onClick = onDismiss,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFEF4444)
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(54.dp)
+                        ) {
+                            Text(
+                                "العودة للعمل", 
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -426,68 +438,10 @@ fun ZenLockApp(
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "BgAnimation")
-    val glowAnimX1 by infiniteTransition.animateFloat(
-        initialValue = 0.05f,
-        targetValue = 0.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowX1"
-    )
-    val glowAnimY1 by infiniteTransition.animateFloat(
-        initialValue = 0.05f,
-        targetValue = 0.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(5000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowY1"
-    )
-    val glowAnimX2 by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 0.95f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(6000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowX2"
-    )
-    val glowAnimY2 by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 0.95f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowY2"
-    )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(if (isDarkTheme) com.example.ui.theme.FrostedBackgroundDark else com.example.ui.theme.FrostedBackgroundLight)
-            .drawBehind {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(com.example.ui.theme.FrostedPurple.copy(alpha = if (isDarkTheme) 0.35f else 0.18f), Color.Transparent),
-                        center = Offset(size.width * glowAnimX1, size.height * glowAnimY1),
-                        radius = size.width * 0.9f
-                    ),
-                    radius = size.width * 0.9f,
-                    center = Offset(size.width * glowAnimX1, size.height * glowAnimY1)
-                )
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(com.example.ui.theme.FrostedBlue.copy(alpha = if (isDarkTheme) 0.35f else 0.18f), Color.Transparent),
-                        center = Offset(size.width * glowAnimX2, size.height * glowAnimY2),
-                        radius = size.width * 0.9f
-                    ),
-                    radius = size.width * 0.9f,
-                    center = Offset(size.width * glowAnimX2, size.height * glowAnimY2)
-                )
-            }
     ) {
         AnimatedContent(
             targetState = Triple(isLockdown, allPermissionsGranted, Unit),
@@ -506,7 +460,7 @@ fun ZenLockApp(
                     onEnableAccessibility = {
                         try {
                             if (android.os.Build.VERSION.SDK_INT >= 33) {
-                                android.widget.Toast.makeText(context, "If taken to 'App Info', tap the top right dots and 'Allow restricted settings'", android.widget.Toast.LENGTH_LONG).show()
+                                android.widget.Toast.makeText(context, "إذا تم نقلك إلى 'معلومات التطبيق'، انقر على النقاط الثلاث بالأعلى واختر 'السماح بالإعدادات المقيدة'", android.widget.Toast.LENGTH_LONG).show()
                             }
                             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                             context.startActivity(intent)
@@ -540,6 +494,7 @@ fun ZenLockApp(
                 val actualTime = if (currentRem > 0) currentRem else lockdownDurationSecs
                 
                 LockdownScreen(
+                    isDarkTheme = isDarkTheme,
                     durationSecs = actualTime,
                     selectedApps = selectedApps,
                     installedApps = installedApps,
@@ -711,11 +666,11 @@ fun SetupScreen(
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            DurationSelector(durationMins, onDurationChange)
+            DurationSelector(isDarkTheme, durationMins, onDurationChange)
             
             Spacer(modifier = Modifier.height(32.dp))
             
-            StartButton(onStart, enabled = selectedApps.isNotEmpty())
+            StartButton(isDarkTheme, onStart, enabled = selectedApps.isNotEmpty())
             
             Spacer(modifier = Modifier.height(32.dp))
         }
@@ -1193,13 +1148,13 @@ fun ThemeToggleButton(isDarkTheme: Boolean, onToggleTheme: () -> Unit) {
 }
 
 @Composable
-fun DurationSelector(durationMins: Int, onDurationChange: (Int) -> Unit) {
+fun DurationSelector(isDarkTheme: Boolean, durationMins: Int, onDurationChange: (Int) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
-            .background(Color.White.copy(alpha = 0.04f))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(28.dp))
+            .background(if (isDarkTheme) Color.White.copy(alpha = 0.04f) else Color(0xFFF1F5F9))
+            .border(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color(0xFFE2E8F0), RoundedCornerShape(28.dp))
             .padding(20.dp)
     ) {
         Column(
@@ -1270,7 +1225,7 @@ fun DurationSelector(durationMins: Int, onDurationChange: (Int) -> Unit) {
                 colors = SliderDefaults.colors(
                     thumbColor = MaterialTheme.colorScheme.primary,
                     activeTrackColor = MaterialTheme.colorScheme.primary,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.1f),
+                    inactiveTrackColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.12f),
                     activeTickColor = Color.Transparent,
                     inactiveTickColor = Color.Transparent
                 ),
@@ -1290,7 +1245,7 @@ fun DurationSelector(durationMins: Int, onDurationChange: (Int) -> Unit) {
 }
 
 @Composable
-fun StartButton(onClick: () -> Unit, enabled: Boolean) {
+fun StartButton(isDarkTheme: Boolean, onClick: () -> Unit, enabled: Boolean) {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.95f else 1f,
@@ -1301,7 +1256,7 @@ fun StartButton(onClick: () -> Unit, enabled: Boolean) {
     val gradientColors = if (enabled) {
         listOf(com.example.ui.theme.FrostedPurple, com.example.ui.theme.FrostedPrimary)
     } else {
-        listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.08f))
+        listOf(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color(0xFFE2E8F0), if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color(0xFFE2E8F0))
     }
 
     Box(
@@ -1315,9 +1270,9 @@ fun StartButton(onClick: () -> Unit, enabled: Boolean) {
                 width = 1.dp,
                 brush = Brush.linearGradient(
                     colors = if (enabled) {
-                        listOf(Color.White.copy(alpha = 0.3f), Color.Transparent)
+                        listOf(if (isDarkTheme) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.6f), Color.Transparent)
                     } else {
-                        listOf(Color.White.copy(alpha = 0.05f), Color.Transparent)
+                        listOf(if (isDarkTheme) Color.White.copy(alpha = 0.05f) else Color.Transparent, Color.Transparent)
                     }
                 ),
                 shape = RoundedCornerShape(24.dp)
@@ -1332,7 +1287,7 @@ fun StartButton(onClick: () -> Unit, enabled: Boolean) {
             Icon(
                 imageVector = Icons.Filled.Lock,
                 contentDescription = null,
-                tint = if (enabled) Color.White else Color.White.copy(alpha = 0.3f),
+                tint = if (enabled) Color.White else (if (isDarkTheme) Color.White.copy(alpha = 0.3f) else Color(0xFF94A3B8)),
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(10.dp))
@@ -1340,7 +1295,7 @@ fun StartButton(onClick: () -> Unit, enabled: Boolean) {
                 text = "ACTIVATE LOCK",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Black,
-                color = if (enabled) Color.White else Color.White.copy(alpha = 0.3f),
+                color = if (enabled) Color.White else (if (isDarkTheme) Color.White.copy(alpha = 0.3f) else Color(0xFF94A3B8)),
                 letterSpacing = 1.5.sp
             )
         }
@@ -1349,6 +1304,7 @@ fun StartButton(onClick: () -> Unit, enabled: Boolean) {
 
 @Composable
 fun LockdownScreen(
+    isDarkTheme: Boolean,
     durationSecs: Int,
     selectedApps: Set<String>,
     installedApps: List<DeviceAppInfo>,
@@ -1419,7 +1375,7 @@ fun LockdownScreen(
                     text = "DEEP SECURITY ACTIVE",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, letterSpacing = 1.sp),
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = if (isDarkTheme) Color.White else com.example.ui.theme.FrostedPrimary
                 )
             }
             
@@ -1433,7 +1389,7 @@ fun LockdownScreen(
                 // Background 3D ring track
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     drawCircle(
-                        color = Color.White.copy(alpha = 0.04f),
+                        color = if (isDarkTheme) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.06f),
                         radius = size.width / 2f - 10.dp.toPx(),
                         style = Stroke(width = 8.dp.toPx())
                     )
@@ -1465,8 +1421,8 @@ fun LockdownScreen(
                         .size(190.dp)
                         .scale(pulseScale)
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.05f))
-                        .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape),
+                        .background(if (isDarkTheme) Color.White.copy(alpha = 0.05f) else Color.White)
+                        .border(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1483,13 +1439,13 @@ fun LockdownScreen(
                                 fontSize = 42.sp,
                                 fontWeight = FontWeight.Black
                             ),
-                            color = Color.White
+                            color = if (isDarkTheme) Color.White else com.example.ui.theme.FrostedTextLight
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "until deep-unlock",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.5f)
+                            color = if (isDarkTheme) Color.White.copy(alpha = 0.5f) else com.example.ui.theme.FrostedTextSecondaryLight
                         )
                     }
                 }
@@ -1501,13 +1457,13 @@ fun LockdownScreen(
                 text = "NO DISTRACTIONS",
                 style = MaterialTheme.typography.titleMedium.copy(letterSpacing = 3.sp),
                 fontWeight = FontWeight.Black,
-                color = Color.White
+                color = if (isDarkTheme) Color.White else com.example.ui.theme.FrostedTextLight
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Loopholes are disabled. Stay in flow.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.5f),
+                color = if (isDarkTheme) Color.White.copy(alpha = 0.5f) else com.example.ui.theme.FrostedTextSecondaryLight,
                 textAlign = TextAlign.Center
             )
 
@@ -1521,7 +1477,7 @@ fun LockdownScreen(
                         text = "SHIELDED APPLICATIONS",
                         style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontSize = 9.sp),
                         fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.4f)
+                        color = if (isDarkTheme) Color.White.copy(alpha = 0.4f) else com.example.ui.theme.FrostedTextSecondaryLight
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
@@ -1529,8 +1485,8 @@ fun LockdownScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .background(Color.White.copy(alpha = 0.04f))
-                            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(16.dp))
+                            .background(if (isDarkTheme) Color.White.copy(alpha = 0.04f) else Color(0xFFF1F5F9))
+                            .border(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.06f) else Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
                             .padding(10.dp)
                     ) {
                         filteredShielded.take(6).forEach { app ->
@@ -1549,14 +1505,14 @@ fun LockdownScreen(
                                 modifier = Modifier
                                     .size(28.dp)
                                     .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.1f)),
+                                    .background(if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.12f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "+${filteredShielded.size - 6}",
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = if (isDarkTheme) Color.White else com.example.ui.theme.FrostedTextLight
                                 )
                             }
                         }
@@ -1668,143 +1624,141 @@ fun PermissionGateScreen(
         label = "pulse"
     )
 
-    // Force "Security" screens to use dark minimalist aesthetic for gravity
-    val screenBg = Color(0xFF0F0F12)
-    val textColor = Color(0xFFF1F5F9)
-    val textSecondary = Color(0xFF94A3B8)
+    val screenBg = if (isDarkTheme) Color(0xFF0F0F12) else com.example.ui.theme.FrostedBackgroundLight
+    val textColor = if (isDarkTheme) Color(0xFFF1F5F9) else com.example.ui.theme.FrostedTextLight
+    val textSecondary = if (isDarkTheme) Color(0xFF94A3B8) else com.example.ui.theme.FrostedTextSecondaryLight
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = screenBg
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .background(screenBg) // Force background
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Header visual shield
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(140.dp)
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = screenBg
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize()
+                    .background(screenBg)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Outer breathing ambient glow aura
+                
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .scale(pulseScale)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    com.example.ui.theme.FrostedPrimary.copy(alpha = 0.25f),
-                                    Color.Transparent
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(140.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(120.dp)
+                            .scale(pulseScale)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        com.example.ui.theme.FrostedPrimary.copy(alpha = 0.25f),
+                                        Color.Transparent
+                                    )
                                 )
                             )
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(if (isDarkTheme) Color.White.copy(alpha = 0.05f) else Color.White)
+                            .border(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.15f) else Color(0xFFE2E8F0), CircleShape)
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Security,
+                            contentDescription = "أيقونة إعداد الأمان",
+                            tint = com.example.ui.theme.FrostedPrimary,
+                            modifier = Modifier
+                                .size(42.dp)
+                                .scale(pulseScale)
                         )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "إعداد الحماية القصوى",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.5).sp
+                    ),
+                    color = textColor,
+                    textAlign = TextAlign.Center
                 )
 
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.05f))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
-                        .padding(12.dp),
-                    contentAlignment = Alignment.Center
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = "يتطلب ZenLock تفعيل 3 أذونات أمان أساسية لضمان إغلاق محكم ومنع أي محاولات للالتفاف على نظام التركيز.",
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                    color = textSecondary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Security,
-                        contentDescription = "Security Setup Icon",
-                        tint = com.example.ui.theme.FrostedPrimary,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .scale(pulseScale)
+                    PermissionCard(
+                        title = "درع إمكانية الوصول",
+                        description = "أساسي لرصد وإغلاق التطبيقات المشتتة فور محاولة فتحها.",
+                        isGranted = isAccessibilityActive,
+                        isDarkTheme = isDarkTheme,
+                        icon = Icons.Filled.AccessibilityNew,
+                        onClick = onEnableAccessibility
+                    )
+
+                    PermissionCard(
+                        title = "مشرف الجهاز (الحماية القصوى)",
+                        description = "يمنع إلغاء تثبيت التطبيق أو إيقافه إجبارياً أثناء جلسة التركيز.",
+                        isGranted = isDeviceAdminActive,
+                        isDarkTheme = isDarkTheme,
+                        icon = Icons.Filled.AdminPanelSettings,
+                        onClick = onEnableDeviceAdmin
+                    )
+
+                    PermissionCard(
+                        title = "وضع إخفاء الإشعارات",
+                        description = "يقوم بإسكات إشعارات التطبيقات المحظورة لضمان هدوء تام.",
+                        isGranted = isNotificationActive,
+                        isDarkTheme = isDarkTheme,
+                        icon = Icons.Filled.NotificationsOff,
+                        onClick = onEnableNotification
                     )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
-            Text(
-                text = "Secure Setup Required",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp
-                ),
-                color = textColor,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = "ZenLock requires 3 secure permissions to completely enforce focus locking and block all system loopholes.",
-                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
-                color = textSecondary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Permissions list
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // 1. Accessibility
-                PermissionCard(
-                    title = "Active Accessibility Shield",
-                    description = "Required to instantly detect and block distracting applications.",
-                    isGranted = isAccessibilityActive,
-                    icon = Icons.Filled.AccessibilityNew,
-                    onClick = onEnableAccessibility
-                )
-
-                // 2. Device Admin
-                PermissionCard(
-                    title = "Device Administrator",
-                    description = "Prevents circumventing the lock, force-stopping the app, or uninstalling it during a session.",
-                    isGranted = isDeviceAdminActive,
-                    icon = Icons.Filled.AdminPanelSettings,
-                    onClick = onEnableDeviceAdmin
-                )
-
-                // 3. Notification Access
-                PermissionCard(
-                    title = "Stealth Notifications",
-                    description = "Silently dismisses notifications from blocked apps so you remain focused.",
-                    isGranted = isNotificationActive,
-                    icon = Icons.Filled.NotificationsOff,
-                    onClick = onEnableNotification
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    color = textColor.copy(alpha = 0.5f),
-                    strokeWidth = 2.dp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Awaiting full security clearance...",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = textColor.copy(alpha = 0.5f)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = com.example.ui.theme.FrostedPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "في انتظار تفعيل كافة الصلاحيات...",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = textColor.copy(alpha = 0.6f)
+                    )
+                }
             }
         }
     }
@@ -1815,11 +1769,12 @@ fun PermissionCard(
     title: String,
     description: String,
     isGranted: Boolean,
+    isDarkTheme: Boolean,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit
 ) {
-    val borderColor = if (isGranted) Color(0xFF10B981) else Color.White.copy(alpha = 0.08f)
-    val bgColor = if (isGranted) Color(0xFF10B981).copy(alpha = 0.05f) else Color.White.copy(alpha = 0.04f)
+    val borderColor = if (isGranted) Color(0xFF10B981) else (if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color(0xFFE2E8F0))
+    val bgColor = if (isGranted) Color(0xFF10B981).copy(alpha = 0.05f) else (if (isDarkTheme) Color.White.copy(alpha = 0.04f) else Color(0xFFF1F5F9))
 
     Row(
         modifier = Modifier
@@ -1829,55 +1784,50 @@ fun PermissionCard(
             .border(1.dp, borderColor, RoundedCornerShape(20.dp))
             .clickable(enabled = !isGranted, onClick = onClick)
             .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(if (isGranted) Color(0xFF10B981).copy(alpha = 0.15f) else (if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(if (isGranted) Color(0xFF10B981).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isGranted) Icons.Filled.Check else icon,
-                    contentDescription = null,
-                    tint = if (isGranted) Color(0xFF10B981) else Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = if (isGranted) Color.White else Color(0xFFF1F5F9)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.labelSmall.copy(lineHeight = 14.sp),
-                    color = Color(0xFF94A3B8)
-                )
-            }
+            Icon(
+                imageVector = if (isGranted) Icons.Filled.Check else icon,
+                contentDescription = null,
+                tint = if (isGranted) Color(0xFF10B981) else (if (isDarkTheme) Color.White else Color(0xFF475569)),
+                modifier = Modifier.size(22.dp)
+            )
         }
-        
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = if (isGranted) Color(0xFF10B981) else (if (isDarkTheme) Color.White else Color(0xFF0F172A))
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.labelSmall.copy(lineHeight = 14.sp),
+                color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF64748B)
+            )
+        }
         
         if (!isGranted) {
             Icon(
-                imageVector = Icons.Filled.ChevronRight,
+                imageVector = Icons.Default.KeyboardArrowLeft,
                 contentDescription = "Grant",
-                tint = Color.White.copy(alpha = 0.5f),
+                tint = if (isDarkTheme) Color.White.copy(alpha = 0.5f) else Color(0xFF475569),
                 modifier = Modifier.size(24.dp)
             )
         }
     }
 }
+
+@Composable
+fun textSecondary(): Color = Color(0xFF94A3B8)
 
 @Composable
 fun InstructionStepRow(

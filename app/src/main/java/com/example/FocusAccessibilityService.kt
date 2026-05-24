@@ -35,7 +35,7 @@ class FocusAccessibilityService : AccessibilityService() {
                         try {
                             Toast.makeText(
                                 this,
-                                "🛡️ ZenLock: Focus session active. This app is currently restricted.",
+                                "🛡️ وضع التركيز نشط حالياً. تم تقييد الوصول لضمان إنتاجيتك.",
                                 Toast.LENGTH_SHORT
                             ).show()
                         } catch (e: Exception) {
