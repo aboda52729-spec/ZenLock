@@ -132,4 +132,24 @@ object LockSettings {
             prefs.edit().putString("custom_presets_v2", serialized).apply()
         }
     }
+
+    fun getSelectedLanguage(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        var lang = prefs.getString("selected_language", "") ?: ""
+        if (lang.isEmpty()) {
+            val systemLanguage = java.util.Locale.getDefault().language
+            lang = if (listOf("ar", "en", "es", "fr", "hi").contains(systemLanguage)) {
+                systemLanguage
+            } else {
+                "en"
+            }
+            prefs.edit().putString("selected_language", lang).apply()
+        }
+        return lang
+    }
+
+    fun setSelectedLanguage(context: Context, lang: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString("selected_language", lang).apply()
+    }
 }

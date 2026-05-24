@@ -26,8 +26,10 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -218,11 +220,14 @@ fun BlockedNotificationDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val selectedLang = remember { LockSettings.getSelectedLanguage(context) }
+    fun t(key: String): String = Translations.get(key, selectedLang)
+
     val isStealthActive = remember { LockSettings.isStealthModeEnabled(context) }
     var appLabelState by remember(packageName) { mutableStateOf(packageName) }
     LaunchedEffect(packageName) {
         if (packageName == "adult_content_blocked_shield") {
-            appLabelState = "درع التعافي والوقاية"
+            appLabelState = t("shield_title")
         } else {
             val label = withContext(Dispatchers.IO) {
                 try {
@@ -238,6 +243,8 @@ fun BlockedNotificationDialog(
     }
     val appLabel = if (isStealthActive && packageName != "adult_content_blocked_shield") "Blocked" else appLabelState
 
+    val layoutDirection = if (selectedLang == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
@@ -248,7 +255,7 @@ fun BlockedNotificationDialog(
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
                 Surface(
                     shape = RoundedCornerShape(28.dp),
                     color = Color(0xFF0F0F12),
@@ -302,7 +309,11 @@ fun BlockedNotificationDialog(
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Text(
-                            text = if (packageName == "adult_content_blocked_shield") "تم تفعيل درع التعافي بنجاح!" else (if (isStealthActive) "الوصول غير متاح" else "الوصول مقيد الان"),
+                            text = if (packageName == "adult_content_blocked_shield") {
+                                t("shield_title")
+                            } else {
+                                if (isStealthActive) t("blocked_screen_title") else t("blocked_screen_title")
+                            },
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color(0xFFEF4444)
@@ -312,11 +323,11 @@ fun BlockedNotificationDialog(
 
                         Text(
                             text = if (packageName == "adult_content_blocked_shield") {
-                                "تم صد محاولة تصفح الإباحية، تشغيل الـ VPN، أو العبث بالإعدادات بنجاح. حريتك ونقاء عقلك وروحك هما الأهم. غايتك السامية تستحق الثبات!"
+                                t("recovery_shield_success")
                             } else if (isStealthActive) {
-                                "تم إخفاء وعزل هذا التطبيق تماماً تحت وضع عدم الأثر لضمان عدم توفير أي مشتتات أو رغبة بصرية في فتحه. واصل التركيز!"
+                                t("stealth_mode_active_info")
                             } else {
-                                "تطبيق \"$appLabel\" يقع ضمن قائمة التطبيقات الممنوعة خلال جلسة التركيز الحالية. حافظ على إنتاجيتك واستمر في التركيز."
+                                t("fallback_blocked_desc").replace("this", "\"$appLabel\"").replace("This app", "\"$appLabel\"")
                             },
                             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 24.sp),
                             color = Color(0xFFE2E8F0),
@@ -336,7 +347,7 @@ fun BlockedNotificationDialog(
                                 .height(54.dp)
                         ) {
                             Text(
-                                if (packageName == "adult_content_blocked_shield") "أنا ثابت وعلى العهد" else "العودة للعمل", 
+                                if (packageName == "adult_content_blocked_shield") t("on_the_covenant") else t("return_to_work"), 
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
@@ -447,6 +458,7 @@ fun ZenLockApp(
     var isLockdown by remember { mutableStateOf(LockSettings.isLockdownActive(context)) }
     var selectedApps by remember { mutableStateOf(LockSettings.getBlockedApps(context)) }
     var lockdownDurationSecs by remember { mutableIntStateOf(25 * 60) } // Default 25 min
+    var selectedLang by remember { mutableStateOf(LockSettings.getSelectedLanguage(context)) }
     
     // Loaded list of launcher applications
     var installedApps by remember { mutableStateOf<List<DeviceAppInfo>>(emptyList()) }
@@ -534,6 +546,11 @@ fun ZenLockApp(
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
+                    },
+                    selectedLang = selectedLang,
+                    onLangChange = { lang ->
+                        LockSettings.setSelectedLanguage(context, lang)
+                        selectedLang = lang
                     }
                 )
             } else if (lockdown) {
@@ -585,6 +602,11 @@ fun ZenLockApp(
                             LockSettings.setLockdown(context, true, lockdownDurationSecs)
                             isLockdown = true
                         }
+                    },
+                    selectedLang = selectedLang,
+                    onLangChange = { lang ->
+                        LockSettings.setSelectedLanguage(context, lang)
+                        selectedLang = lang
                     }
                 )
             }
@@ -607,318 +629,381 @@ fun SetupScreen(
     onStealthModeToggle: (Boolean) -> Unit,
     onAntiPornShieldToggle: (Boolean) -> Unit,
     onAppToggle: (String) -> Unit,
-    onStart: () -> Unit
+    onStart: () -> Unit,
+    selectedLang: String,
+    onLangChange: (String) -> Unit
 ) {
     val context = LocalContext.current
     var showAppPicker by remember { mutableStateOf(false) }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(16.dp))
-            HeaderBlock(isDarkTheme, onToggleTheme)
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Apps selected Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(if (isDarkTheme) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.03f))
-                    .border(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f), RoundedCornerShape(32.dp))
-                    .padding(24.dp)
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Shielded Apps",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${selectedApps.size} Locked",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = com.example.ui.theme.FrostedPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(com.example.ui.theme.FrostedPrimary.copy(alpha = 0.15f))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
+    val layoutDirection = if (selectedLang == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
 
-                    // Selected apps previews
-                    val filteredSelected = installedApps.filter { selectedApps.contains(it.packageName) }
-                    
-                    if (filteredSelected.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No apps targeted.\nTap below to select apps to lock.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    } else {
-                        // Display up to 6 selected apps in small dynamic badges
-                        FlowRow(
+    fun t(key: String): String = Translations.get(key, selectedLang)
+
+    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Language selection chips row at the top as requested!
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(if (isDarkTheme) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.02f))
+                        .border(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.04f), RoundedCornerShape(24.dp))
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = t("language_selection"),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = com.example.ui.theme.FrostedPrimary,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                        LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            filteredSelected.take(8).forEach { app ->
-                                SelectedBadge(app) { onAppToggle(app.packageName) }
-                            }
-                            if (filteredSelected.size > 8) {
+                            items(Translations.LANGUAGES) { lang ->
+                                val isSelected = lang.code == selectedLang
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(Color.White.copy(alpha = 0.08f))
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(
+                                            if (isSelected) {
+                                                com.example.ui.theme.FrostedPrimary
+                                            } else {
+                                                if (isDarkTheme) Color(0xFF334155).copy(alpha = 0.3f) else Color(0xFFE2E8F0)
+                                            }
+                                        )
+                                        .clickable {
+                                            onLangChange(lang.code)
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = "+${filteredSelected.size - 8} more",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = lang.flag, style = MaterialTheme.typography.bodyMedium)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = lang.name,
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = if (isSelected) Color.White else (if (isDarkTheme) Color.White.copy(alpha = 0.8f) else Color(0xFF475569))
+                                        )
+                                    }
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                    
-                    Button(
-                        onClick = { showAppPicker = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f),
-                            contentColor = MaterialTheme.colorScheme.onBackground
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Icon(imageVector = Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Add / Edit Block List", style = MaterialTheme.typography.labelLarge)
                     }
                 }
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
 
-            // Stealth Mode Card (No Trace Mode)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(
-                        if (isDarkTheme) {
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0xFF1E293B).copy(alpha = 0.4f),
-                                    Color(0xFF0F172A).copy(alpha = 0.4f)
-                                )
+                Spacer(modifier = Modifier.height(16.dp))
+                HeaderBlock(isDarkTheme, onToggleTheme, selectedLang)
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Apps selected Card
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(if (isDarkTheme) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.03f))
+                        .border(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f), RoundedCornerShape(32.dp))
+                        .padding(24.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = t("shielded_apps"),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontWeight = FontWeight.Bold
                             )
-                        } else {
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0xFFF1F5F9).copy(alpha = 0.8f),
-                                    Color(0xFFE2E8F0).copy(alpha = 0.8f)
-                                )
+                            Text(
+                                text = "${selectedApps.size} ${t("locked_count")}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = com.example.ui.theme.FrostedPrimary,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(com.example.ui.theme.FrostedPrimary.copy(alpha = 0.15f))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.horizontalGradient(
-                            if (isDarkTheme) {
-                                listOf(Color(0xFF818CF8).copy(alpha = 0.3f), Color(0xFF6366F1).copy(alpha = 0.05f))
-                            } else {
-                                listOf(Color(0xFF6366F1).copy(alpha = 0.2f), Color(0xFFE2E8F0).copy(alpha = 0.4f))
-                            }
-                        ),
-                        shape = RoundedCornerShape(32.dp)
-                    )
-                    .padding(24.dp)
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+
+                        // Selected apps previews
+                        val filteredSelected = installedApps.filter { selectedApps.contains(it.packageName) }
+                        
+                        if (filteredSelected.isEmpty()) {
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isDarkTheme) Color(0xFF6366F1).copy(alpha = 0.15f) else Color(0xFF6366F1).copy(alpha = 0.1f)),
+                                    .fillMaxWidth()
+                                    .height(120.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.VisibilityOff,
-                                    contentDescription = "Stealth Icon",
-                                    tint = Color(0xFF818CF8),
-                                    modifier = Modifier.size(20.dp)
+                                Text(
+                                    text = t("no_apps_targeted"),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
                                 )
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = "ميزة عدم الأثر (Stealth)",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = if (isDarkTheme) Color.White else Color(0xFF0F172A)
-                                )
-                                Text(
-                                    text = "وضع التخفي البصري والسرية الحصري",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF64748B)
-                                )
-                            }
-                        }
-                        Switch(
-                            checked = isStealthModeOn,
-                            onCheckedChange = { onStealthModeToggle(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = Color(0xFF6366F1),
-                                uncheckedThumbColor = if (isDarkTheme) Color(0xFF64748B) else Color(0xFF94A3B8),
-                                uncheckedTrackColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
-                            )
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "عند تفعيل وضع عدم الأثر، يتم تحويل شارات وأيقونات البرامج المحجبة إلى شارة وإشارة غامضة باسم \"Blocked\" مع إخفاء رمز واسم التطبيقات الأصلي لمنع استثارة فضولك أو إعادة الرغبة البصرية في زيارتها.",
-                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
-                        color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Adult & VPN Anti-Relapse Shield Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(
-                        if (isDarkTheme) {
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0xFFEF4444).copy(alpha = 0.12f),
-                                    Color(0xFF7F1D1D).copy(alpha = 0.08f)
-                                )
-                            )
                         } else {
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0xFFFEF2F2).copy(alpha = 0.9f),
-                                    Color(0xFFFCA5A5).copy(alpha = 0.3f)
-                                )
-                            )
-                        }
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.horizontalGradient(
-                            if (isDarkTheme) {
-                                listOf(Color(0xFFEF4444).copy(alpha = 0.35f), Color(0xFF7F1D1D).copy(alpha = 0.1f))
-                            } else {
-                                listOf(Color(0xFFEF4444).copy(alpha = 0.25f), Color(0xFFFCA5A5).copy(alpha = 0.4f))
-                            }
-                        ),
-                        shape = RoundedCornerShape(32.dp)
-                    )
-                    .padding(24.dp)
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isDarkTheme) Color(0xFFEF4444).copy(alpha = 0.2f) else Color(0xFFEF4444).copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
+                            // Display up to 6 selected apps in small dynamic badges
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Lock,
-                                    contentDescription = "Shield Active Icon",
-                                    tint = Color(0xFFEF4444),
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                filteredSelected.take(8).forEach { app ->
+                                    SelectedBadge(app) { onAppToggle(app.packageName) }
+                                }
+                                if (filteredSelected.size > 8) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color.White.copy(alpha = 0.08f))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = "+${filteredSelected.size - 8} more",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = "درع التعافي والوقاية الكاملة",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = if (isDarkTheme) Color.White else Color(0xFF7F1D1D)
-                                )
-                                Text(
-                                    text = "ضد المواقع الإباحية والـ VPN والإعدادات",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isDarkTheme) Color(0xFFFCA5A5) else Color(0xFF991B1B)
-                                )
-                            }
+                            Spacer(modifier = Modifier.height(16.dp))
                         }
-                        Switch(
-                            checked = isAntiPornShieldOn,
-                            onCheckedChange = { onAntiPornShieldToggle(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = Color(0xFFEF4444),
-                                uncheckedThumbColor = if (isDarkTheme) Color(0xFF64748B) else Color(0xFF94A3B8),
-                                uncheckedTrackColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
+                        
+                        Button(
+                            onClick = { showAppPicker = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f),
+                                contentColor = MaterialTheme.colorScheme.onBackground
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Icon(imageVector = Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = t("add_edit_list"), style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Stealth Mode Card (No Trace Mode)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(
+                            if (isDarkTheme) {
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFF1E293B).copy(alpha = 0.4f),
+                                        Color(0xFF0F172A).copy(alpha = 0.4f)
+                                    )
+                                )
+                            } else {
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFFF1F5F9).copy(alpha = 0.8f),
+                                        Color(0xFFE2E8F0).copy(alpha = 0.8f)
+                                    )
+                                )
+                            }
+                        )
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.horizontalGradient(
+                                if (isDarkTheme) {
+                                    listOf(Color(0xFF818CF8).copy(alpha = 0.3f), Color(0xFF6366F1).copy(alpha = 0.05f))
+                                } else {
+                                    listOf(Color(0xFF6366F1).copy(alpha = 0.2f), Color(0xFFE2E8F0).copy(alpha = 0.4f))
+                                }
+                            ),
+                            shape = RoundedCornerShape(32.dp)
+                        )
+                        .padding(24.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isDarkTheme) Color(0xFF6366F1).copy(alpha = 0.15f) else Color(0xFF6366F1).copy(alpha = 0.1f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.VisibilityOff,
+                                        contentDescription = "Stealth Icon",
+                                        tint = Color(0xFF818CF8),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = t("stealth_title"),
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = if (isDarkTheme) Color.White else Color(0xFF0F172A)
+                                    )
+                                    Text(
+                                        text = t("stealth_subtitle"),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF64748B)
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = isStealthModeOn,
+                                onCheckedChange = { onStealthModeToggle(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFF6366F1),
+                                    uncheckedThumbColor = if (isDarkTheme) Color(0xFF64748B) else Color(0xFF94A3B8),
+                                    uncheckedTrackColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
+                                )
                             )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = t("stealth_desc"),
+                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+                            color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569)
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "عند تفعيله، ينشط جدار وقائي ذكي يمنع تماماً محاولات فتح أي موقع إباحي عبر كافة المتصفحات، ويعزل تطبيقات والتحكمات الخاصة بـ VPN أو تغيير إعدادات إمكانية الوصول لمنع الالتفاف حتى ينتهي العداد مع الإغلاق الكلي للمنشط.",
-                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
-                        color = if (isDarkTheme) Color(0xFFF3F4F6).copy(alpha = 0.8f) else Color(0xFF1F2937).copy(alpha = 0.9f)
-                    )
                 }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Adult & VPN Anti-Relapse Shield Card
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(
+                            if (isDarkTheme) {
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFFEF4444).copy(alpha = 0.12f),
+                                        Color(0xFF7F1D1D).copy(alpha = 0.08f)
+                                    )
+                                )
+                            } else {
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFFFEF2F2).copy(alpha = 0.9f),
+                                        Color(0xFFFCA5A5).copy(alpha = 0.3f)
+                                    )
+                                )
+                            }
+                        )
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.horizontalGradient(
+                                if (isDarkTheme) {
+                                    listOf(Color(0xFFEF4444).copy(alpha = 0.35f), Color(0xFF7F1D1D).copy(alpha = 0.1f))
+                                } else {
+                                    listOf(Color(0xFFEF4444).copy(alpha = 0.25f), Color(0xFFFCA5A5).copy(alpha = 0.4f))
+                                }
+                            ),
+                            shape = RoundedCornerShape(32.dp)
+                        )
+                        .padding(24.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isDarkTheme) Color(0xFFEF4444).copy(alpha = 0.2f) else Color(0xFFEF4444).copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Lock,
+                                        contentDescription = "Shield Active Icon",
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = t("shield_title"),
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = if (isDarkTheme) Color.White else Color(0xFF7F1D1D)
+                                    )
+                                    Text(
+                                        text = t("shield_subtitle"),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isDarkTheme) Color(0xFFFCA5A5) else Color(0xFF991B1B)
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = isAntiPornShieldOn,
+                                onCheckedChange = { onAntiPornShieldToggle(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFFEF4444),
+                                    uncheckedThumbColor = if (isDarkTheme) Color(0xFF64748B) else Color(0xFF94A3B8),
+                                    uncheckedTrackColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = t("shield_desc"),
+                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+                            color = if (isDarkTheme) Color(0xFFF3F4F6).copy(alpha = 0.8f) else Color(0xFF1F2937).copy(alpha = 0.9f)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                DurationSelector(isDarkTheme, durationSecs, onDurationChange, selectedLang)
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                StartButton(isDarkTheme, onStart, enabled = selectedApps.isNotEmpty() || isAntiPornShieldOn, selectedLang = selectedLang)
+                
+                Spacer(modifier = Modifier.height(32.dp))
             }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            DurationSelector(isDarkTheme, durationSecs, onDurationChange)
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            StartButton(isDarkTheme, onStart, enabled = selectedApps.isNotEmpty() || isAntiPornShieldOn)
-            
-            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 
@@ -1311,7 +1396,7 @@ fun FlowRow(
 }
 
 @Composable
-fun HeaderBlock(isDarkTheme: Boolean, onToggleTheme: () -> Unit) {
+fun HeaderBlock(isDarkTheme: Boolean, onToggleTheme: () -> Unit, selectedLang: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1319,13 +1404,13 @@ fun HeaderBlock(isDarkTheme: Boolean, onToggleTheme: () -> Unit) {
     ) {
         Column {
             Text(
-                text = "ZenLock",
+                text = Translations.get("app_title", selectedLang),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                text = "Deep Focus Shield",
+                text = Translations.get("app_subtitle", selectedLang),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1408,7 +1493,7 @@ fun ThemeToggleButton(isDarkTheme: Boolean, onToggleTheme: () -> Unit) {
 }
 
 @Composable
-fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: (Int) -> Unit) {
+fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: (Int) -> Unit, selectedLang: String) {
     val context = LocalContext.current
     var presets by remember { mutableStateOf(LockSettings.getSavedPresets(context)) }
     
@@ -1418,6 +1503,76 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
     
     var showAddPresetDialog by remember { mutableStateOf(false) }
     var newPresetName by remember { mutableStateOf("") }
+
+    val tTitle = Translations.get("timer_title", selectedLang)
+    val tSubtitle = Translations.get("timer_subtitle", selectedLang)
+    val tSavePreset = Translations.get("save_preset", selectedLang)
+    val tPresetsTitle = Translations.get("presets_title", selectedLang)
+
+    fun trans(key: String): String {
+        return when (key) {
+            "save_cust_preset" -> when (selectedLang) {
+                "ar" -> "حفظ كإعداد مسبق مخصص"
+                "es" -> "Guardar ajuste personalizado"
+                "fr" -> "Enregistrer préréglage"
+                "hi" -> "कस्टम प्रीसेट सहेजें"
+                else -> "Save Custom Preset"
+            }
+            "save_cust_preset_desc" -> when (selectedLang) {
+                "ar" -> "سيتم حفظ الوقت الحالي (${hours}س و ${minutes}د و ${seconds}ث) للوصول السريع مستقبلاً."
+                "es" -> "Se guardará el tiempo actual (${hours}h ${minutes}m ${seconds}s) para acceso rápido."
+                "fr" -> "Le temps actuel (${hours}h ${minutes}m ${seconds}s) sera sauvegardé."
+                "hi" -> "त्वरित पहुँच के लिए वर्तमान समय (${hours}घं ${minutes}मि ${seconds}से) सहेजा जाएगा।"
+                else -> "The current time (${hours}h ${minutes}m ${seconds}s) will be saved for quick access."
+            }
+            "preset_name_label" -> when (selectedLang) {
+                "ar" -> "اسم الإعداد المسبق"
+                "es" -> "Nombre del ajuste"
+                "fr" -> "Nom du préréglage"
+                "hi" -> "प्रीसेट का नाम"
+                else -> "Preset Name"
+            }
+            "cancel" -> when (selectedLang) {
+                "ar" -> "إلغاء"
+                "es" -> "Cancelar"
+                "fr" -> "Annuler"
+                "hi" -> "रद्द करें"
+                else -> "Cancel"
+            }
+            "save_now" -> when (selectedLang) {
+                "ar" -> "حفظ الآن"
+                "es" -> "Guardar"
+                "fr" -> "Enregistrer"
+                "hi" -> "अभी सहेजें"
+                else -> "Save Now"
+            }
+            "timer_final_name" -> when (selectedLang) {
+                "ar" -> "مؤقت ${hours}س:${minutes}د:${seconds}ث"
+                "es" -> "Temporizador ${hours}h:${minutes}m:${seconds}s"
+                "fr" -> "Minuteur ${hours}h:${minutes}m:${seconds}s"
+                "hi" -> "टाइमर ${hours}घं:${minutes}मि:${seconds}से"
+                else -> "Timer ${hours}h:${minutes}m:${seconds}s"
+            }
+            "reset_lbl" -> when (selectedLang) {
+                "ar" -> "إعادة ضبط (٢٥د)"
+                "es" -> "Reiniciar (25m)"
+                "fr" -> "Réinitialiser (25m)"
+                "hi" -> "रीसेट (25मि)"
+                else -> "Reset (25m)"
+            }
+            else -> key
+        }
+    }
+
+    fun getPresetDisplayName(rawName: String): String {
+        return when (rawName) {
+            "بومودورو (25د)", "بومودورو ٢٥د", "Pomodoro (25m)" -> Translations.get("pomodoro", selectedLang)
+            "تركيز عميق (1س)", "تركيز عميق أولى", "Deep Focus (1h)" -> Translations.get("deep_focus", selectedLang)
+            "فحص تركيز (10ث)", "تجريبي", "Focus Test (10s)" -> Translations.get("focus_test", selectedLang)
+            "انطلاقة (5د)", "انطلاقة هادئة", "Kickstart (5m)" -> Translations.get("kickstart", selectedLang)
+            else -> rawName
+        }
+    }
     
     Box(
         modifier = Modifier
@@ -1458,12 +1613,12 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
             ) {
                 Column {
                     Text(
-                        text = "مؤقت احترافي",
+                        text = tTitle,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                         color = if (isDarkTheme) Color.White else Color(0xFF0F172A)
                     )
                     Text(
-                        text = "حدد وقت الجلسة السريعة أو المخصصة بدقة بالغة",
+                        text = tSubtitle,
                         style = MaterialTheme.typography.labelSmall,
                         color = if (isDarkTheme) Color(0xFF818CF8) else Color(0xFF6366F1)
                     )
@@ -1583,7 +1738,7 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
                 ) {
                     Icon(imageVector = Icons.Filled.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "حفظ كإعداد مسبق", style = MaterialTheme.typography.labelMedium)
+                    Text(text = tSavePreset, style = MaterialTheme.typography.labelMedium)
                 }
                 
                 Button(
@@ -1601,14 +1756,14 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
                 ) {
                     Icon(imageVector = Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "إعادة ضبط (٢٥د)", style = MaterialTheme.typography.labelMedium)
+                    Text(text = trans("reset_lbl"), style = MaterialTheme.typography.labelMedium)
                 }
             }
             
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
-                text = "المفضلات المخزنة والافتراضية:",
+                text = tPresetsTitle,
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF64748B),
                 modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
@@ -1642,7 +1797,7 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = pair.first,
+                                text = getPresetDisplayName(pair.first),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = if (durationSecs == pair.second) Color(0xFF818CF8) else (if (isDarkTheme) Color.White else Color(0xFF1E293B))
                             )
@@ -1678,14 +1833,14 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "حفظ كإعداد مسبق مخصص",
+                        text = trans("save_cust_preset"),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = if (isDarkTheme) Color.White else Color(0xFF0F172A),
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "سيتم حفظ الوقت الحالي (${hours}س و ${minutes}د و ${seconds}ث) للوصول السريع مستقبلاً.",
+                        text = trans("save_cust_preset_desc"),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569),
                         textAlign = TextAlign.Center
@@ -1694,7 +1849,7 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
                     OutlinedTextField(
                         value = newPresetName,
                         onValueChange = { newPresetName = it },
-                        label = { Text("اسم الإعداد المسبق") },
+                        label = { Text(trans("preset_name_label")) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF6366F1),
@@ -1712,12 +1867,12 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
                             colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = if (isDarkTheme) Color.White else Color(0xFF475569)),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("إلغاء")
+                            Text(trans("cancel"))
                         }
                         
                         Button(
                             onClick = {
-                                val finalizedName = newPresetName.trim().ifEmpty { "مؤقت ${hours}س:${minutes}د" }
+                                val finalizedName = newPresetName.trim().ifEmpty { trans("timer_final_name") }
                                 LockSettings.savePreset(context, finalizedName, durationSecs)
                                 presets = LockSettings.getSavedPresets(context)
                                 newPresetName = ""
@@ -1726,7 +1881,7 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
                             modifier = Modifier.weight(1.5f)
                         ) {
-                            Text("حفظ الآن", color = Color.White)
+                            Text(trans("save_now"), color = Color.White)
                         }
                     }
                 }
@@ -1744,74 +1899,96 @@ fun TimeDrumColumn(
     isDarkTheme: Boolean,
     onValueChange: (Int) -> Unit
 ) {
+    val context = LocalContext.current
+    val selectedLang = remember { LockSettings.getSelectedLanguage(context) }
+    val displayLabel = if (selectedLang == "ar") labelArabic else labelEnglish
+
+    var dragAccumulator by remember { mutableStateOf(0f) }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(64.dp)
+        modifier = Modifier.width(72.dp)
     ) {
-        IconButton(
-            onClick = {
-                val nextVal = if (value >= range.last) range.first else value + 1
-                onValueChange(nextVal)
-            },
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.KeyboardArrowUp,
-                contentDescription = "Increase",
-                tint = Color(0xFF6366F1),
-                modifier = Modifier.size(24.dp)
-            )
-        }
-        
         Box(
             modifier = Modifier
-                .size(width = 64.dp, height = 56.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(if (isDarkTheme) Color.Black.copy(alpha = 0.3f) else Color(0xFFF8FAFC))
+                .size(width = 68.dp, height = 110.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(
+                    if (isDarkTheme) Color(0xFF1E293B).copy(alpha = 0.8f) else Color(0xFFE2E8F0).copy(alpha = 0.6f)
+                )
                 .border(
-                    1.dp,
-                    if (isDarkTheme) Color.White.copy(alpha = 0.12f) else Color(0xFFCBD5E1),
-                    RoundedCornerShape(12.dp)
-                ),
+                    width = 1.5.dp,
+                    color = if (isDarkTheme) Color(0xFF6366F1).copy(alpha = 0.4f) else Color(0xFF818CF8).copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(20.dp)
+                )
+                .pointerInput(value) {
+                    detectVerticalDragGestures(
+                        onDragEnd = { dragAccumulator = 0f },
+                        onDragCancel = { dragAccumulator = 0f },
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            dragAccumulator += dragAmount
+                            // Smooth threshold: 36 pixels of swipe triggers incremental change
+                            val threshold = 36f
+                            if (dragAccumulator >= threshold) {
+                                val prevVal = if (value <= range.first) range.last else value - 1
+                                onValueChange(prevVal)
+                                dragAccumulator = 0f
+                            } else if (dragAccumulator <= -threshold) {
+                                val nextVal = if (value >= range.last) range.first else value + 1
+                                onValueChange(nextVal)
+                                dragAccumulator = 0f
+                            }
+                        }
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = String.format("%02d", value),
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                ),
-                color = if (isDarkTheme) Color.White else Color(0xFF0F172A)
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Ghost number (top fading)
+                val prevVal = if (value <= range.first) range.last else value - 1
+                Text(
+                    text = String.format("%02d", prevVal),
+                    color = (if (isDarkTheme) Color.White else Color(0xFF0F172A)).copy(alpha = 0.2f),
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                    modifier = Modifier.scale(0.85f)
+                )
+                
+                Spacer(modifier = Modifier.height(6.dp))
+                
+                // Active primary number in display scale
+                Text(
+                    text = String.format("%02d", value),
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    ),
+                    color = if (isDarkTheme) Color(0xFF818CF8) else Color(0xFF6366F1)
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Ghost number (bottom fading)
+                val nextVal = if (value >= range.last) range.first else value + 1
+                Text(
+                    text = String.format("%02d", nextVal),
+                    color = (if (isDarkTheme) Color.White else Color(0xFF0F172A)).copy(alpha = 0.2f),
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                    modifier = Modifier.scale(0.85f)
+                )
+            }
         }
         
-        IconButton(
-            onClick = {
-                val nextVal = if (value <= range.first) range.last else value - 1
-                onValueChange(nextVal)
-            },
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.KeyboardArrowDown,
-                contentDescription = "Decrease",
-                tint = Color(0xFF6366F1),
-                modifier = Modifier.size(24.dp)
-            )
-        }
-        
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = labelArabic,
+            text = displayLabel,
             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
             color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569)
-        )
-        Text(
-            text = labelEnglish,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-            color = if (isDarkTheme) Color.White.copy(alpha = 0.3f) else Color(0xFF94A3B8)
         )
     }
 }
@@ -2218,7 +2395,7 @@ fun ChallengeStepCircle(step: Int, currentStep: Int, text: String) {
 }
 
 @Composable
-fun StartButton(isDarkTheme: Boolean, onClick: () -> Unit, enabled: Boolean) {
+fun StartButton(isDarkTheme: Boolean, onClick: () -> Unit, enabled: Boolean, selectedLang: String) {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.95f else 1f,
@@ -2265,7 +2442,7 @@ fun StartButton(isDarkTheme: Boolean, onClick: () -> Unit, enabled: Boolean) {
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = "ACTIVATE LOCK",
+                text = Translations.get("activate_lock", selectedLang),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Black,
                 color = if (enabled) Color.White else (if (isDarkTheme) Color.White.copy(alpha = 0.3f) else Color(0xFF94A3B8)),
@@ -2636,7 +2813,9 @@ fun PermissionGateScreen(
     isDeviceAdminActive: Boolean,
     onEnableAccessibility: () -> Unit,
     onEnableNotification: () -> Unit,
-    onEnableDeviceAdmin: () -> Unit
+    onEnableDeviceAdmin: () -> Unit,
+    selectedLang: String,
+    onLangChange: (String) -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "ShieldPulse")
     val pulseScale by infiniteTransition.animateFloat(
@@ -2653,7 +2832,9 @@ fun PermissionGateScreen(
     val textColor = if (isDarkTheme) Color(0xFFF1F5F9) else com.example.ui.theme.FrostedTextLight
     val textSecondary = if (isDarkTheme) Color(0xFF94A3B8) else com.example.ui.theme.FrostedTextSecondaryLight
 
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+    val layoutDirection = if (selectedLang == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
+
+    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = screenBg
@@ -2669,6 +2850,61 @@ fun PermissionGateScreen(
             ) {
                 
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // Language selector row
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(if (isDarkTheme) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.02f))
+                        .border(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.04f), RoundedCornerShape(24.dp))
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = Translations.get("language_selection", selectedLang),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = com.example.ui.theme.FrostedPrimary,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            items(Translations.LANGUAGES) { lang ->
+                                val isSelected = lang.code == selectedLang
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(
+                                            if (isSelected) {
+                                                com.example.ui.theme.FrostedPrimary
+                                            } else {
+                                                if (isDarkTheme) Color(0xFF334155).copy(alpha = 0.3f) else Color(0xFFE2E8F0)
+                                            }
+                                        )
+                                        .clickable {
+                                            onLangChange(lang.code)
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = lang.flag, style = MaterialTheme.typography.bodyMedium)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = lang.name,
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = if (isSelected) Color.White else (if (isDarkTheme) Color.White.copy(alpha = 0.8f) else Color(0xFF475569))
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Box(
                     contentAlignment = Alignment.Center,
@@ -2700,7 +2936,7 @@ fun PermissionGateScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Security,
-                            contentDescription = "أيقونة إعداد الأمان",
+                            contentDescription = "Shield Icon",
                             tint = com.example.ui.theme.FrostedPrimary,
                             modifier = Modifier
                                 .size(42.dp)
@@ -2712,7 +2948,7 @@ fun PermissionGateScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
-                    text = "إعداد الحماية القصوى",
+                    text = Translations.get("permission_setup_title", selectedLang),
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = (-0.5).sp
@@ -2724,7 +2960,7 @@ fun PermissionGateScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "يتطلب ZenLock تفعيل 3 أذونات أمان أساسية لضمان إغلاق محكم ومنع أي محاولات للالتفاف على نظام التركيز.",
+                    text = Translations.get("permission_setup_desc", selectedLang),
                     style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
                     color = textSecondary,
                     textAlign = TextAlign.Center,
@@ -2738,30 +2974,33 @@ fun PermissionGateScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     PermissionCard(
-                        title = "درع إمكانية الوصول",
-                        description = "أساسي لرصد وإغلاق التطبيقات المشتتة فور محاولة فتحها.",
+                        title = Translations.get("perm_accessibility_title", selectedLang),
+                        description = Translations.get("perm_accessibility_desc", selectedLang),
                         isGranted = isAccessibilityActive,
                         isDarkTheme = isDarkTheme,
                         icon = Icons.Filled.AccessibilityNew,
-                        onClick = onEnableAccessibility
+                        onClick = onEnableAccessibility,
+                        selectedLang = selectedLang
                     )
 
                     PermissionCard(
-                        title = "مشرف الجهاز (الحماية القصوى)",
-                        description = "يمنع إلغاء تثبيت التطبيق أو إيقافه إجبارياً أثناء جلسة التركيز.",
+                        title = Translations.get("perm_admin_title", selectedLang),
+                        description = Translations.get("perm_admin_desc", selectedLang),
                         isGranted = isDeviceAdminActive,
                         isDarkTheme = isDarkTheme,
                         icon = Icons.Filled.AdminPanelSettings,
-                        onClick = onEnableDeviceAdmin
+                        onClick = onEnableDeviceAdmin,
+                        selectedLang = selectedLang
                     )
 
                     PermissionCard(
-                        title = "وضع إخفاء الإشعارات",
-                        description = "يقوم بإسكات إشعارات التطبيقات المحظورة لضمان هدوء تام.",
+                        title = Translations.get("perm_notif_title", selectedLang),
+                        description = Translations.get("perm_notif_desc", selectedLang),
                         isGranted = isNotificationActive,
                         isDarkTheme = isDarkTheme,
                         icon = Icons.Filled.NotificationsOff,
-                        onClick = onEnableNotification
+                        onClick = onEnableNotification,
+                        selectedLang = selectedLang
                     )
                 }
 
@@ -2779,7 +3018,7 @@ fun PermissionGateScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "في انتظار تفعيل كافة الصلاحيات...",
+                        text = Translations.get("perm_waiting", selectedLang),
                         style = MaterialTheme.typography.labelSmall,
                         color = textColor.copy(alpha = 0.6f)
                     )
@@ -2796,7 +3035,8 @@ fun PermissionCard(
     isGranted: Boolean,
     isDarkTheme: Boolean,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    selectedLang: String
 ) {
     val borderColor = if (isGranted) Color(0xFF10B981) else (if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color(0xFFE2E8F0))
     val bgColor = if (isGranted) Color(0xFF10B981).copy(alpha = 0.05f) else (if (isDarkTheme) Color.White.copy(alpha = 0.04f) else Color(0xFFF1F5F9))
@@ -2841,9 +3081,10 @@ fun PermissionCard(
         }
         
         if (!isGranted) {
+            val arrowIcon = if (selectedLang == "ar") Icons.Default.KeyboardArrowLeft else Icons.Default.KeyboardArrowRight
             Icon(
-                imageVector = Icons.Default.KeyboardArrowLeft,
-                contentDescription = "Grant",
+                imageVector = arrowIcon,
+                contentDescription = "Grant Permission",
                 tint = if (isDarkTheme) Color.White.copy(alpha = 0.5f) else Color(0xFF475569),
                 modifier = Modifier.size(24.dp)
             )

@@ -146,3 +146,24 @@ tasks.register("copyLauncherIcons") {
 tasks.named("preBuild") {
   dependsOn("copyLauncherIcons")
 }
+
+tasks.register("copyApkToOutputs") {
+  val buildDirFile = layout.buildDirectory.asFile
+  val rootDirFile = rootProject.projectDir
+  doLast {
+    val src = File(buildDirFile.get(), "outputs/apk/debug/app-debug.apk")
+    val dest = File(rootDirFile, ".build-outputs/app-debug.apk")
+    if (src.exists()) {
+      dest.parentFile.mkdirs()
+      src.copyTo(dest, overwrite = true)
+      println("Successfully copied APK to ${dest.absolutePath}")
+    } else {
+      println("Source APK does not exist: ${src.absolutePath}")
+    }
+  }
+}
+
+afterEvaluate {
+  tasks.findByName("assembleDebug")?.finalizedBy("copyApkToOutputs")
+}
+
