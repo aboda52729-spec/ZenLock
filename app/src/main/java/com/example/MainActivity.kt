@@ -71,6 +71,8 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 
 class MainActivity : ComponentActivity() {
     private val blockedAppNameState = androidx.compose.runtime.mutableStateOf<String?>(null)
@@ -154,7 +156,8 @@ fun AppIcon(
     fallbackLabel: String,
     fallbackColor: Color,
     isStealthMode: Boolean = false,
-    textStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleMedium
+    textStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleMedium,
+    colorFilter: ColorFilter? = null
 ) {
     if (isStealthMode) {
         Box(
@@ -201,7 +204,8 @@ fun AppIcon(
             Image(
                 bitmap = appIcon,
                 contentDescription = "$fallbackLabel icon",
-                modifier = modifier
+                modifier = modifier,
+                colorFilter = colorFilter
             )
         } else {
             Box(
@@ -1660,26 +1664,15 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
                     .height(168.dp),
                 contentAlignment = Alignment.TopCenter
             ) {
-                // Focus Active Selector Banner - perfectly aligned vertically with the center row of numbers (44.dp to 88.dp inside the 132.dp drum)
+                // Focus Active Selector Banner - Clean minimalist floating selector
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.92f)
-                        .height(50.dp)
-                        .offset(y = 41.dp) // Aligns with the vertical center of the 132.dp drum, framing the active digits perfectly
+                        .fillMaxWidth(0.85f)
+                        .height(52.dp)
+                        .offset(y = 40.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
-                            Brush.verticalGradient(
-                                if (isDarkTheme) {
-                                    listOf(Color(0xFF6366F1).copy(alpha = 0.15f), Color(0xFF6366F1).copy(alpha = 0.05f))
-                                } else {
-                                    listOf(Color(0xFF6366F1).copy(alpha = 0.08f), Color(0xFF6366F1).copy(alpha = 0.02f))
-                                }
-                            )
-                        )
-                        .border(
-                            1.dp,
-                            if (isDarkTheme) Color(0xFF818CF8).copy(alpha = 0.35f) else Color(0xFF6366F1).copy(alpha = 0.25f),
-                            RoundedCornerShape(12.dp)
+                            if (isDarkTheme) Color(0xFF6366F1).copy(alpha = 0.12f) else Color(0xFF6366F1).copy(alpha = 0.05f)
                         )
                 )
 
@@ -2001,8 +1994,7 @@ fun TimeDrumColumn(
     ) {
         Box(
             modifier = Modifier
-                .size(width = 68.dp, height = 132.dp)
-                .clip(RoundedCornerShape(12.dp)), // Soft clip to keep the scroll clean within the column bounds without any background/borders
+                .size(width = 72.dp, height = 132.dp),
             contentAlignment = Alignment.Center
         ) {
             LazyColumn(
@@ -2046,10 +2038,10 @@ fun TimeDrumColumn(
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default
                             ),
-                            color = if (isDarkTheme) {
-                                if (distance < 0.5f) Color(0xFF818CF8) else Color.White
+                            color = if (distance < 0.35f) {
+                                Color(0xFF6366F1)
                             } else {
-                                if (distance < 0.5f) Color(0xFF6366F1) else Color(0xFF0F172A)
+                                if (isDarkTheme) Color.White.copy(alpha = 0.3f) else Color(0xFF0F172A).copy(alpha = 0.2f)
                             }
                         )
                     }
@@ -2722,16 +2714,32 @@ fun LockdownScreen(
                             .padding(10.dp)
                     ) {
                         filteredShielded.take(6).forEach { app ->
-                            AppIcon(
-                                packageName = app.packageName,
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape),
-                                fallbackLabel = app.label,
-                                fallbackColor = app.color,
-                                isStealthMode = false,
-                                textStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Black)
-                            )
+                            Box(contentAlignment = Alignment.BottomEnd) {
+                                AppIcon(
+                                    packageName = app.packageName,
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .graphicsLayer { 
+                                            alpha = 0.7f
+                                        },
+                                    fallbackLabel = app.label,
+                                    fallbackColor = app.color,
+                                    isStealthMode = false,
+                                    textStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Black),
+                                    colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0.1f) })
+                                )
+                                Icon(
+                                    imageVector = Icons.Filled.Lock,
+                                    contentDescription = null,
+                                    tint = Color(0xFF6366F1),
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .offset(x = 2.dp, y = 2.dp)
+                                        .background(if (isDarkTheme) Color(0xFF0F172A) else Color.White, CircleShape)
+                                        .padding(1.dp)
+                                )
+                            }
                         }
                         if (filteredShielded.size > 6) {
                             Box(
