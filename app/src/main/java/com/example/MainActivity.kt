@@ -1657,36 +1657,36 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp),
-                contentAlignment = Alignment.Center
+                    .height(168.dp),
+                contentAlignment = Alignment.TopCenter
             ) {
+                // Focus Active Selector Banner - perfectly aligned vertically with the center row of numbers (44.dp to 88.dp inside the 132.dp drum)
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(84.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .fillMaxWidth(0.92f)
+                        .height(50.dp)
+                        .offset(y = 41.dp) // Aligns with the vertical center of the 132.dp drum, framing the active digits perfectly
+                        .clip(RoundedCornerShape(12.dp))
                         .background(
                             Brush.verticalGradient(
                                 if (isDarkTheme) {
-                                    listOf(Color(0xFF6366F1).copy(alpha = 0.08f), Color(0xFF818CF8).copy(alpha = 0.02f))
+                                    listOf(Color(0xFF6366F1).copy(alpha = 0.15f), Color(0xFF6366F1).copy(alpha = 0.05f))
                                 } else {
-                                    listOf(Color(0xFF6366F1).copy(alpha = 0.05f), Color.Transparent)
+                                    listOf(Color(0xFF6366F1).copy(alpha = 0.08f), Color(0xFF6366F1).copy(alpha = 0.02f))
                                 }
                             )
                         )
                         .border(
                             1.dp,
-                            if (isDarkTheme) Color(0xFF818CF8).copy(alpha = 0.3f) else Color(0xFF6366F1).copy(alpha = 0.2f),
-                            RoundedCornerShape(16.dp)
+                            if (isDarkTheme) Color(0xFF818CF8).copy(alpha = 0.35f) else Color(0xFF6366F1).copy(alpha = 0.25f),
+                            RoundedCornerShape(12.dp)
                         )
                 )
 
                 Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.Top
                 ) {
                     TimeDrumColumn(
                         value = hours,
@@ -1699,12 +1699,21 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
                         }
                     )
                     
-                    Text(
-                        text = ":",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
-                        color = Color(0xFF6366F1),
-                        modifier = Modifier.padding(bottom = 24.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .height(132.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = ":",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 24.sp
+                            ),
+                            color = Color(0xFF6366F1),
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                    }
 
                     TimeDrumColumn(
                         value = minutes,
@@ -1717,12 +1726,21 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
                         }
                     )
                     
-                    Text(
-                        text = ":",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
-                        color = Color(0xFF6366F1),
-                        modifier = Modifier.padding(bottom = 24.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .height(132.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = ":",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 24.sp
+                            ),
+                            color = Color(0xFF6366F1),
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                    }
 
                     TimeDrumColumn(
                         value = seconds,
@@ -1748,13 +1766,14 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
                     onClick = { showAddPresetDialog = true },
                     modifier = Modifier
                         .weight(1f)
-                        .height(46.dp),
+                        .heightIn(min = 46.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color(0xFFF1F5F9),
                         contentColor = if (isDarkTheme) Color.White else Color(0xFF475569)
                     ),
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color(0xFFE2E8F0))
+                    border = BorderStroke(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color(0xFFE2E8F0)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                 ) {
                     Icon(imageVector = Icons.Filled.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -1767,12 +1786,13 @@ fun DurationSelector(isDarkTheme: Boolean, durationSecs: Int, onDurationChange: 
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .height(46.dp),
+                        .heightIn(min = 46.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF6366F1).copy(alpha = 0.15f),
                         contentColor = Color(0xFF6366F1)
                     ),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                 ) {
                     Icon(imageVector = Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -1982,25 +2002,9 @@ fun TimeDrumColumn(
         Box(
             modifier = Modifier
                 .size(width = 68.dp, height = 132.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(
-                    if (isDarkTheme) Color(0xFF1E293B).copy(alpha = 0.8f) else Color(0xFFE2E8F0).copy(alpha = 0.6f)
-                )
-                .border(
-                    width = 1.5.dp,
-                    color = if (isDarkTheme) Color(0xFF6366F1).copy(alpha = 0.4f) else Color(0xFF818CF8).copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(20.dp)
-                ),
+                .clip(RoundedCornerShape(12.dp)), // Soft clip to keep the scroll clean within the column bounds without any background/borders
             contentAlignment = Alignment.Center
         ) {
-            // Highlights Central Focus area
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(itemHeightDp)
-                    .background(Color(0xFF6366F1).copy(alpha = 0.08f))
-            )
-
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -2040,7 +2044,7 @@ fun TimeDrumColumn(
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default
                             ),
                             color = if (isDarkTheme) {
                                 if (distance < 0.5f) Color(0xFF818CF8) else Color.White
