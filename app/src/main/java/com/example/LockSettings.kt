@@ -9,6 +9,7 @@ object LockSettings {
     private const val KEY_BLOCKED_APPS = "blocked_apps"
     private const val KEY_LOCKDOWN_END = "lockdown_end"
     private const val KEY_STEALTH_MODE_ENABLED = "stealth_mode_enabled"
+    private const val KEY_ANTI_PORN_SHIELD_ENABLED = "anti_porn_shield_enabled"
 
     fun isStealthModeEnabled(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -18,6 +19,16 @@ object LockSettings {
     fun setStealthModeEnabled(context: Context, enabled: Boolean) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putBoolean(KEY_STEALTH_MODE_ENABLED, enabled).apply()
+    }
+
+    fun isAntiPornShieldEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_ANTI_PORN_SHIELD_ENABLED, false)
+    }
+
+    fun setAntiPornShieldEnabled(context: Context, enabled: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_ANTI_PORN_SHIELD_ENABLED, enabled).apply()
     }
 
     fun isLockdownActive(context: Context): Boolean {

@@ -221,18 +221,22 @@ fun BlockedNotificationDialog(
     val isStealthActive = remember { LockSettings.isStealthModeEnabled(context) }
     var appLabelState by remember(packageName) { mutableStateOf(packageName) }
     LaunchedEffect(packageName) {
-        val label = withContext(Dispatchers.IO) {
-            try {
-                val pm = context.packageManager
-                val info = pm.getApplicationInfo(packageName, 0)
-                pm.getApplicationLabel(info).toString()
-            } catch (e: Exception) {
-                packageName
+        if (packageName == "adult_content_blocked_shield") {
+            appLabelState = "درع التعافي والوقاية"
+        } else {
+            val label = withContext(Dispatchers.IO) {
+                try {
+                    val pm = context.packageManager
+                    val info = pm.getApplicationInfo(packageName, 0)
+                    pm.getApplicationLabel(info).toString()
+                } catch (e: Exception) {
+                    packageName
+                }
             }
+            appLabelState = label
         }
-        appLabelState = label
     }
-    val appLabel = if (isStealthActive) "Blocked" else appLabelState
+    val appLabel = if (isStealthActive && packageName != "adult_content_blocked_shield") "Blocked" else appLabelState
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -265,22 +269,40 @@ fun BlockedNotificationDialog(
                                 .background(Brush.radialGradient(listOf(Color(0xFFEF4444).copy(alpha = 0.2f), Color.Transparent))),
                             contentAlignment = Alignment.Center
                         ) {
-                            AppIcon(
-                                packageName = packageName,
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(CircleShape)
-                                    .border(2.dp, Color(0xFFEF4444).copy(alpha = 0.5f), CircleShape),
-                                fallbackLabel = appLabel,
-                                fallbackColor = Color(0xFFEF4444),
-                                isStealthMode = isStealthActive
-                            )
+                            if (packageName == "adult_content_blocked_shield") {
+                                Box(
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFEF4444).copy(alpha = 0.15f))
+                                        .border(2.dp, Color(0xFFEF4444), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Lock,
+                                        contentDescription = "Shield Active",
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            } else {
+                                AppIcon(
+                                    packageName = packageName,
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(CircleShape)
+                                        .border(2.dp, Color(0xFFEF4444).copy(alpha = 0.5f), CircleShape),
+                                    fallbackLabel = appLabel,
+                                    fallbackColor = Color(0xFFEF4444),
+                                    isStealthMode = isStealthActive
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Text(
-                            text = if (isStealthActive) "الوصول غير متاح" else "الوصول مقيد الان",
+                            text = if (packageName == "adult_content_blocked_shield") "تم تفعيل درع التعافي بنجاح!" else (if (isStealthActive) "الوصول غير متاح" else "الوصول مقيد الان"),
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color(0xFFEF4444)
@@ -289,7 +311,9 @@ fun BlockedNotificationDialog(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Text(
-                            text = if (isStealthActive) {
+                            text = if (packageName == "adult_content_blocked_shield") {
+                                "تم صد محاولة تصفح الإباحية، تشغيل الـ VPN، أو العبث بالإعدادات بنجاح. حريتك ونقاء عقلك وروحك هما الأهم. غايتك السامية تستحق الثبات!"
+                            } else if (isStealthActive) {
                                 "تم إخفاء وعزل هذا التطبيق تماماً تحت وضع عدم الأثر لضمان عدم توفير أي مشتتات أو رغبة بصرية في فتحه. واصل التركيز!"
                             } else {
                                 "تطبيق \"$appLabel\" يقع ضمن قائمة التطبيقات الممنوعة خلال جلسة التركيز الحالية. حافظ على إنتاجيتك واستمر في التركيز."
@@ -312,7 +336,7 @@ fun BlockedNotificationDialog(
                                 .height(54.dp)
                         ) {
                             Text(
-                                "العودة للعمل", 
+                                if (packageName == "adult_content_blocked_shield") "أنا ثابت وعلى العهد" else "العودة للعمل", 
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
@@ -432,6 +456,7 @@ fun ZenLockApp(
     var isStealthActive by remember { mutableStateOf(isNotificationServiceEnabled(context)) }
     var isDeviceAdminActive by remember { mutableStateOf(isDeviceAdminEnabled(context)) }
     var isStealthModeOn by remember { mutableStateOf(LockSettings.isStealthModeEnabled(context)) }
+    var isAntiPornShieldOn by remember { mutableStateOf(LockSettings.isAntiPornShieldEnabled(context)) }
 
     val allPermissionsGranted = isShieldActive && isStealthActive && isDeviceAdminActive
 
@@ -537,9 +562,14 @@ fun ZenLockApp(
                     isShieldActive = isShieldActive,
                     isStealthActive = isStealthActive,
                     isStealthModeOn = isStealthModeOn,
+                    isAntiPornShieldOn = isAntiPornShieldOn,
                     onStealthModeToggle = { enabled ->
                         LockSettings.setStealthModeEnabled(context, enabled)
                         isStealthModeOn = enabled
+                    },
+                    onAntiPornShieldToggle = { enabled ->
+                        LockSettings.setAntiPornShieldEnabled(context, enabled)
+                        isAntiPornShieldOn = enabled
                     },
                     onAppToggle = { pkgName ->
                         selectedApps = if (selectedApps.contains(pkgName)) {
@@ -550,7 +580,7 @@ fun ZenLockApp(
                         LockSettings.setBlockedApps(context, selectedApps)
                     },
                     onStart = {
-                        if (selectedApps.isNotEmpty()) {
+                        if (selectedApps.isNotEmpty() || isAntiPornShieldOn) {
                             LockSettings.setBlockedApps(context, selectedApps)
                             LockSettings.setLockdown(context, true, lockdownDurationSecs)
                             isLockdown = true
@@ -573,7 +603,9 @@ fun SetupScreen(
     isShieldActive: Boolean,
     isStealthActive: Boolean,
     isStealthModeOn: Boolean,
+    isAntiPornShieldOn: Boolean,
     onStealthModeToggle: (Boolean) -> Unit,
+    onAntiPornShieldToggle: (Boolean) -> Unit,
     onAppToggle: (String) -> Unit,
     onStart: () -> Unit
 ) {
@@ -787,12 +819,104 @@ fun SetupScreen(
             }
             
             Spacer(modifier = Modifier.height(24.dp))
+
+            // Adult & VPN Anti-Relapse Shield Card
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(
+                        if (isDarkTheme) {
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0xFFEF4444).copy(alpha = 0.12f),
+                                    Color(0xFF7F1D1D).copy(alpha = 0.08f)
+                                )
+                            )
+                        } else {
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0xFFFEF2F2).copy(alpha = 0.9f),
+                                    Color(0xFFFCA5A5).copy(alpha = 0.3f)
+                                )
+                            )
+                        }
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.horizontalGradient(
+                            if (isDarkTheme) {
+                                listOf(Color(0xFFEF4444).copy(alpha = 0.35f), Color(0xFF7F1D1D).copy(alpha = 0.1f))
+                            } else {
+                                listOf(Color(0xFFEF4444).copy(alpha = 0.25f), Color(0xFFFCA5A5).copy(alpha = 0.4f))
+                            }
+                        ),
+                        shape = RoundedCornerShape(32.dp)
+                    )
+                    .padding(24.dp)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDarkTheme) Color(0xFFEF4444).copy(alpha = 0.2f) else Color(0xFFEF4444).copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Lock,
+                                    contentDescription = "Shield Active Icon",
+                                    tint = Color(0xFFEF4444),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "درع التعافي والوقاية الكاملة",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isDarkTheme) Color.White else Color(0xFF7F1D1D)
+                                )
+                                Text(
+                                    text = "ضد المواقع الإباحية والـ VPN والإعدادات",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isDarkTheme) Color(0xFFFCA5A5) else Color(0xFF991B1B)
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = isAntiPornShieldOn,
+                            onCheckedChange = { onAntiPornShieldToggle(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFFEF4444),
+                                uncheckedThumbColor = if (isDarkTheme) Color(0xFF64748B) else Color(0xFF94A3B8),
+                                uncheckedTrackColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "عند تفعيله، ينشط جدار وقائي ذكي يمنع تماماً محاولات فتح أي موقع إباحي عبر كافة المتصفحات، ويعزل تطبيقات والتحكمات الخاصة بـ VPN أو تغيير إعدادات إمكانية الوصول لمنع الالتفاف حتى ينتهي العداد مع الإغلاق الكلي للمنشط.",
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+                        color = if (isDarkTheme) Color(0xFFF3F4F6).copy(alpha = 0.8f) else Color(0xFF1F2937).copy(alpha = 0.9f)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
             
             DurationSelector(isDarkTheme, durationSecs, onDurationChange)
             
             Spacer(modifier = Modifier.height(32.dp))
             
-            StartButton(isDarkTheme, onStart, enabled = selectedApps.isNotEmpty())
+            StartButton(isDarkTheme, onStart, enabled = selectedApps.isNotEmpty() || isAntiPornShieldOn)
             
             Spacer(modifier = Modifier.height(32.dp))
         }
