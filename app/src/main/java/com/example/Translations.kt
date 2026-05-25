@@ -57,7 +57,12 @@ object Translations {
             "vpn_detected" to "🛡️ تم كشف اتصال VPN نشط! تم حظره فوراً لحمايتك.",
             "porn_content_detected" to "🛡️ تم حجب المحتوى تلقائياً بواسطة درع التعافي الذكي لـ ZenLock!",
             "focus_active_default_msg" to "🛡️ وضع التركيز نشط حالياً. تم تقييد الوصول لضمان إنتاجيتك.",
-            "language_selection" to "لغة التطبيق"
+            "language_selection" to "لغة التطبيق",
+            "uninstall_protection_title" to "حماية إزالة التطبيق",
+            "uninstall_protection_subtitle" to "منع الحذف نهائياً لعدد محدد من الأيام",
+            "uninstall_protection_desc" to "عند تفعيل هذه الميزة، لا يمكنك إلغاء تثبيت التطبيق نهائياً أو إيقاف مشرف الجهاز حتى ينتهي عدد الأيام التي حددتها أدناه. هذا يضمن عدم تراجعك أبداً.",
+            "set_protection" to "تفعيل الحماية",
+            "days" to "أيام"
         ),
         "en" to mapOf(
             "app_title" to "ZenLock",
@@ -104,7 +109,12 @@ object Translations {
             "vpn_detected" to "🛡️ Active VPN detected! Blocked instantly for your protection.",
             "porn_content_detected" to "🛡️ Content blocked by ZenLock Smart Recovery Shield!",
             "focus_active_default_msg" to "🛡️ Focus session active. Access restricted to maintain productivity.",
-            "language_selection" to "App Language"
+            "language_selection" to "App Language",
+            "uninstall_protection_title" to "Uninstall Protection",
+            "uninstall_protection_subtitle" to "Prevent uninstallation for a number of days",
+            "uninstall_protection_desc" to "Once activated, you cannot uninstall the app or disable device admin for the selected number of days. This guarantees you will not backtrack.",
+            "set_protection" to "Set Protection",
+            "days" to "Days"
         ),
         "es" to mapOf(
             "app_title" to "ZenLock",

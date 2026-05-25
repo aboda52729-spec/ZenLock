@@ -82,7 +82,8 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
         enableEdgeToEdge()
         setContent {
-            var isDarkTheme by remember { mutableStateOf<Boolean?>(null) }
+            val context = LocalContext.current
+            var isDarkTheme by remember { mutableStateOf<Boolean?>(LockSettings.isDarkThemePreferred(context)) }
             val systemTheme = isSystemInDarkTheme()
             val useDark = isDarkTheme ?: systemTheme
 
@@ -108,7 +109,11 @@ class MainActivity : ComponentActivity() {
                 val blockedPackage by blockedAppNameState
                 ZenLockApp(
                     isDarkTheme = useDark,
-                    onToggleTheme = { isDarkTheme = !useDark },
+                    onToggleTheme = {
+                        val next = !useDark
+                        LockSettings.setDarkThemePreferred(context, next)
+                        isDarkTheme = next
+                    },
                     blockedPackage = blockedPackage,
                     onClearBlockedMessage = {
                         blockedAppNameState.value = null
@@ -1023,6 +1028,10 @@ fun SetupScreen(
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
+                UninstallProtectionSettingsCard(isDarkTheme, selectedLang)
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
                 DurationSelector(isDarkTheme, durationSecs, onDurationChange, selectedLang)
                 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -1223,6 +1232,206 @@ fun StealthStatusBanner(isActive: Boolean, onClick: () -> Unit) {
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun UninstallProtectionSettingsCard(isDarkTheme: Boolean, selectedLang: String) {
+    val context = LocalContext.current
+    var showDialog by remember { mutableStateOf(false) }
+    var selectedDays by remember { mutableIntStateOf(3) }
+    var isProtectionActive by remember { mutableStateOf(LockSettings.isUninstallProtectionActive(context)) }
+
+    fun t(key: String): String = Translations.get(key, selectedLang)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(32.dp))
+            .background(
+                if (isDarkTheme) {
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF8B5CF6).copy(alpha = 0.15f),
+                            Color(0xFF4C1D95).copy(alpha = 0.1f)
+                        )
+                    )
+                } else {
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFFF3E8FF).copy(alpha = 0.9f),
+                            Color(0xFFD8B4FE).copy(alpha = 0.4f)
+                        )
+                    )
+                }
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.horizontalGradient(
+                    if (isDarkTheme) {
+                        listOf(Color(0xFF8B5CF6).copy(alpha = 0.4f), Color(0xFF6D28D9).copy(alpha = 0.15f))
+                    } else {
+                        listOf(Color(0xFF8B5CF6).copy(alpha = 0.3f), Color(0xFFD8B4FE).copy(alpha = 0.5f))
+                    }
+                ),
+                shape = RoundedCornerShape(32.dp)
+            )
+            .padding(24.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(if (isDarkTheme) Color(0xFF8B5CF6).copy(alpha = 0.25f) else Color(0xFF8B5CF6).copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Security,
+                            contentDescription = "Security Icon",
+                            tint = Color(0xFF8B5CF6),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = t("uninstall_protection_title"),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = if (isDarkTheme) Color.White else Color(0xFF4C1D95)
+                        )
+                        Text(
+                            text = t("uninstall_protection_subtitle"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isDarkTheme) Color(0xFFC4B5FD) else Color(0xFF5B21B6)
+                        )
+                    }
+                }
+                
+                if (isProtectionActive) {
+                    val endMillis = remember { LockSettings.getUninstallProtectionEndTime(context) }
+                    val remain = maxOf(0L, endMillis - System.currentTimeMillis())
+                    val remainDays = (remain / (1000 * 60 * 60 * 24)).toInt()
+                    val remainHours = ((remain / (1000 * 60 * 60)) % 24).toInt()
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Icon(imageVector = Icons.Filled.Lock, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
+                        Text(
+                            text = "$remainDays ${t("days")}, $remainHours h",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF10B981)
+                        )
+                    }
+                } else {
+                    Button(
+                        onClick = { showDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(t("set_protection"), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = t("uninstall_protection_desc"),
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+                color = if (isDarkTheme) Color(0xFFF3F4F6).copy(alpha = 0.8f) else Color(0xFF1F2937).copy(alpha = 0.9f)
+            )
+        }
+    }
+
+    if (showDialog && !isProtectionActive) {
+        Dialog(onDismissRequest = { showDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = if (isDarkTheme) Color(0xFF1E293B) else Color.White,
+                tonalElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Security,
+                        contentDescription = null,
+                        tint = Color(0xFF8B5CF6),
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = t("uninstall_protection_title"),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDarkTheme) Color.White else Color.Black
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "${selectedDays} ${t("days")}",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF8B5CF6)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        IconButton(
+                            onClick = { if (selectedDays > 1) selectedDays-- },
+                            modifier = Modifier
+                                .background(if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f), CircleShape)
+                        ) {
+                            Icon(imageVector = Icons.Filled.Remove, contentDescription = "Decrease", tint = if (isDarkTheme) Color.White else Color.Black)
+                        }
+                        Slider(
+                            value = selectedDays.toFloat(),
+                            onValueChange = { selectedDays = it.toInt() },
+                            valueRange = 1f..365f,
+                            steps = 364,
+                            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color(0xFF8B5CF6),
+                                activeTrackColor = Color(0xFF8B5CF6)
+                            )
+                        )
+                        IconButton(
+                            onClick = { if (selectedDays < 365) selectedDays++ },
+                            modifier = Modifier
+                                .background(if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f), CircleShape)
+                        ) {
+                            Icon(imageVector = Icons.Filled.Add, contentDescription = "Increase", tint = if (isDarkTheme) Color.White else Color.Black)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { showDialog = false }) {
+                            Text(if (selectedLang == "ar") "إلغاء" else "Cancel", color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF64748B))
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                LockSettings.setUninstallProtectionDays(context, selectedDays)
+                                isProtectionActive = true
+                                showDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6))
+                        ) {
+                            Text(t("set_protection"), color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }

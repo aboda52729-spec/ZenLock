@@ -11,7 +11,19 @@ class FocusDeviceAdminReceiver : DeviceAdminReceiver() {
     }
 
     override fun onDisableRequested(context: Context, intent: Intent): CharSequence {
-        return "Disabling device admin will reduce the strength of your focus sessions."
+        val endMillis = LockSettings.getUninstallProtectionEndTime(context)
+        if (System.currentTimeMillis() < endMillis) {
+            val remain = endMillis - System.currentTimeMillis()
+            val remainDays = (remain / (1000 * 60 * 60 * 24)).toInt()
+            val remainHours = ((remain / (1000 * 60 * 60)) % 24).toInt()
+            val remainMins = ((remain / (1000 * 60)) % 60).toInt()
+            if (remainDays > 0) {
+                return "حماية إزالة التطبيق نشطة. باقٍ للانتهاء $remainDays يوم و $remainHours ساعة."
+            } else {
+                return "حماية إزالة التطبيق نشطة. باقٍ للانتهاء $remainHours ساعة و $remainMins دقيقة."
+            }
+        }
+        return "إيقاف مسؤول الجهاز سيؤدي إلى إضعاف جلسات التركيز الخاصة بك."
     }
 
     override fun onDisabled(context: Context, intent: Intent) {

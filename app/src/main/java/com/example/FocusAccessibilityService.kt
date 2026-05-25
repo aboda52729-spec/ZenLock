@@ -24,6 +24,22 @@ class FocusAccessibilityService : AccessibilityService() {
                 // Fast check to avoid heavy processing on every content change our own package
                 if (packageName == "com.example" || packageName == "com.android.systemui") return
                 
+                // Prevent uninstallation if protection is active
+                val isProtectionActive = LockSettings.isUninstallProtectionActive(this)
+                if (isProtectionActive) {
+                    if (packageName == "com.android.settings") {
+                        val rootNode = rootInActiveWindow
+                        val isUninstallPage = rootNode != null && (hasUninstallKeywords(rootNode))
+                        if (isUninstallPage) {
+                            val endMillis = LockSettings.getUninstallProtectionEndTime(this)
+                            val remain = maxOf(0L, endMillis - System.currentTimeMillis())
+                            val remainDays = (remain / (1000 * 60 * 60 * 24)).toInt()
+                            triggerBlock("adult_content_blocked_shield", true, "🛡️ حماية إزالة التطبيق نشطة! تنتهي بعد $remainDays يوم.")
+                            return
+                        }
+                    }
+                }
+                
                 // Check if lockdown session is active
                 val lockdownActive = LockSettings.isLockdownActive(this)
                 if (lockdownActive) {
@@ -155,6 +171,32 @@ class FocusAccessibilityService : AccessibilityService() {
         )
         for (akw in arabicKeywords) {
             if (text.contains(akw)) return true
+        }
+        return false
+    }
+
+    private fun hasUninstallKeywords(node: AccessibilityNodeInfo?): Boolean {
+        if (node == null) return false
+        
+        val text = node.text?.toString()?.lowercase() ?: ""
+        val contentDesc = node.contentDescription?.toString()?.lowercase() ?: ""
+        
+        if (text.contains("deactivate") || text.contains("إلغاء التنشيط") || text.contains("إلغاء تنشيط")
+           || text.contains("uninstall") || text.contains("إزالة التطبيق") || text.contains("إزالة التثبيت")
+           || text.contains("الغاء التثبيت") || contentDesc.contains("deactivate") || contentDesc.contains("uninstall")) {
+            
+            // Just double checking we are talking about this app (ZenLock) or Device Admin pages
+            if (text.contains("zenlock") || text.contains("responsables") || text.contains("device admin") || text.contains("مسؤول الجهاز") || text.contains("مسؤولو الجهاز")) {
+                return true
+            }
+        }
+        
+        val childCount = node.childCount
+        for (i in 0 until childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = hasUninstallKeywords(child)
+            child.recycle()
+            if (found) return true
         }
         return false
     }
