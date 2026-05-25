@@ -135,6 +135,9 @@ class MainActivity : ComponentActivity() {
             if (pkg != null) {
                 blockedAppNameState.value = pkg
             }
+            // Consume the intent extras so they do not persist through configuration changes, reconstructions, or rotations
+            intent.removeExtra("FROM_BLOCK_TRIGGER")
+            intent.removeExtra("BLOCKED_APP_NAME")
         }
     }
 }
@@ -238,7 +241,6 @@ fun BlockedNotificationDialog(
     val selectedLang = remember { LockSettings.getSelectedLanguage(context) }
     fun t(key: String): String = Translations.get(key, selectedLang)
 
-    val isStealthActive = remember { LockSettings.isStealthModeEnabled(context) }
     var appLabelState by remember(packageName) { mutableStateOf(packageName) }
     LaunchedEffect(packageName) {
         if (packageName == "adult_content_blocked_shield") {
@@ -263,17 +265,7 @@ fun BlockedNotificationDialog(
         onDismiss()
     }
 
-    val appLabel = if (isStealthActive && packageName != "adult_content_blocked_shield") {
-        when (selectedLang) {
-            "ar" -> "تطبيق محمي"
-            "es" -> "Aplicación protegida"
-            "fr" -> "Application protégée"
-            "hi" -> "सुरक्षित ऐप"
-            else -> "Protected App"
-        }
-    } else {
-        appLabelState
-    }
+    val appLabel = appLabelState
 
     val layoutDirection = if (selectedLang == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
 
@@ -333,7 +325,7 @@ fun BlockedNotificationDialog(
                                         .border(2.dp, Color(0xFFEF4444).copy(alpha = 0.5f), CircleShape),
                                     fallbackLabel = appLabel,
                                     fallbackColor = Color(0xFFEF4444),
-                                    isStealthMode = isStealthActive
+                                    isStealthMode = false
                                 )
                             }
                         }
@@ -344,7 +336,7 @@ fun BlockedNotificationDialog(
                             text = if (packageName == "adult_content_blocked_shield") {
                                 t("shield_title")
                             } else {
-                                if (isStealthActive) t("blocked_screen_title") else t("blocked_screen_title")
+                                t("blocked_screen_title")
                             },
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
@@ -356,8 +348,6 @@ fun BlockedNotificationDialog(
                         Text(
                             text = if (packageName == "adult_content_blocked_shield") {
                                 t("recovery_shield_success")
-                            } else if (isStealthActive) {
-                                t("stealth_mode_active_info")
                             } else {
                                 t("fallback_blocked_desc").replace("this", "\"$appLabel\"").replace("This app", "\"$appLabel\"")
                             },
@@ -497,12 +487,11 @@ fun ZenLockApp(
     
     // Shield configuration state
     var isShieldActive by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
-    var isStealthActive by remember { mutableStateOf(isNotificationServiceEnabled(context)) }
+    var isNotificationActive by remember { mutableStateOf(isNotificationServiceEnabled(context)) }
     var isDeviceAdminActive by remember { mutableStateOf(isDeviceAdminEnabled(context)) }
-    var isStealthModeOn by remember { mutableStateOf(LockSettings.isStealthModeEnabled(context)) }
     var isAntiPornShieldOn by remember { mutableStateOf(LockSettings.isAntiPornShieldEnabled(context)) }
 
-    val allPermissionsGranted = isShieldActive && isStealthActive && isDeviceAdminActive
+    val allPermissionsGranted = isShieldActive && isNotificationActive && isDeviceAdminActive
 
     if (blockedPackage != null) {
         BlockedNotificationDialog(
@@ -524,7 +513,7 @@ fun ZenLockApp(
     LaunchedEffect(isLockdown) {
         while (true) {
             isShieldActive = isAccessibilityServiceEnabled(context)
-            isStealthActive = isNotificationServiceEnabled(context)
+            isNotificationActive = isNotificationServiceEnabled(context)
             isDeviceAdminActive = isDeviceAdminEnabled(context)
             delay(2000)
         }
@@ -547,7 +536,7 @@ fun ZenLockApp(
                 PermissionGateScreen(
                     isDarkTheme = isDarkTheme,
                     isAccessibilityActive = isShieldActive,
-                    isNotificationActive = isStealthActive,
+                    isNotificationActive = isNotificationActive,
                     isDeviceAdminActive = isDeviceAdminActive,
                     onEnableAccessibility = {
                         try {
@@ -609,13 +598,8 @@ fun ZenLockApp(
                     selectedApps = selectedApps,
                     installedApps = installedApps,
                     isShieldActive = isShieldActive,
-                    isStealthActive = isStealthActive,
-                    isStealthModeOn = isStealthModeOn,
+                    isNotificationActive = isNotificationActive,
                     isAntiPornShieldOn = isAntiPornShieldOn,
-                    onStealthModeToggle = { enabled ->
-                        LockSettings.setStealthModeEnabled(context, enabled)
-                        isStealthModeOn = enabled
-                    },
                     onAntiPornShieldToggle = { enabled ->
                         LockSettings.setAntiPornShieldEnabled(context, enabled)
                         isAntiPornShieldOn = enabled
@@ -655,10 +639,8 @@ fun SetupScreen(
     selectedApps: Set<String>,
     installedApps: List<DeviceAppInfo>,
     isShieldActive: Boolean,
-    isStealthActive: Boolean,
-    isStealthModeOn: Boolean,
+    isNotificationActive: Boolean,
     isAntiPornShieldOn: Boolean,
-    onStealthModeToggle: (Boolean) -> Unit,
     onAntiPornShieldToggle: (Boolean) -> Unit,
     onAppToggle: (String) -> Unit,
     onStart: () -> Unit,
@@ -844,98 +826,6 @@ fun SetupScreen(
                 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Stealth Mode Card (No Trace Mode)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(32.dp))
-                        .background(
-                            if (isDarkTheme) {
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xFF1E293B).copy(alpha = 0.4f),
-                                        Color(0xFF0F172A).copy(alpha = 0.4f)
-                                    )
-                                )
-                            } else {
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xFFF1F5F9).copy(alpha = 0.8f),
-                                        Color(0xFFE2E8F0).copy(alpha = 0.8f)
-                                    )
-                                )
-                            }
-                        )
-                        .border(
-                            width = 1.dp,
-                            brush = Brush.horizontalGradient(
-                                if (isDarkTheme) {
-                                    listOf(Color(0xFF818CF8).copy(alpha = 0.3f), Color(0xFF6366F1).copy(alpha = 0.05f))
-                                } else {
-                                    listOf(Color(0xFF6366F1).copy(alpha = 0.2f), Color(0xFFE2E8F0).copy(alpha = 0.4f))
-                                }
-                            ),
-                            shape = RoundedCornerShape(32.dp)
-                        )
-                        .padding(24.dp)
-                ) {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isDarkTheme) Color(0xFF6366F1).copy(alpha = 0.15f) else Color(0xFF6366F1).copy(alpha = 0.1f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.VisibilityOff,
-                                        contentDescription = "Stealth Icon",
-                                        tint = Color(0xFF818CF8),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = t("stealth_title"),
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = if (isDarkTheme) Color.White else Color(0xFF0F172A)
-                                    )
-                                    Text(
-                                        text = t("stealth_subtitle"),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF64748B)
-                                    )
-                                }
-                            }
-                            Switch(
-                                checked = isStealthModeOn,
-                                onCheckedChange = { onStealthModeToggle(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = Color(0xFF6366F1),
-                                    uncheckedThumbColor = if (isDarkTheme) Color(0xFF64748B) else Color(0xFF94A3B8),
-                                    uncheckedTrackColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
-                                )
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = t("stealth_desc"),
-                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
-                            color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569)
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-
                 // Adult & VPN Anti-Relapse Shield Card
                 Box(
                     modifier = Modifier
@@ -1025,10 +915,6 @@ fun SetupScreen(
                         )
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                UninstallProtectionSettingsCard(isDarkTheme, selectedLang)
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
@@ -1167,276 +1053,6 @@ fun ShieldStatusBanner(isActive: Boolean, onClick: () -> Unit) {
     }
 }
 
-@Composable
-fun StealthStatusBanner(isActive: Boolean, onClick: () -> Unit) {
-    val containerColor by animateColorAsState(
-        targetValue = if (isActive) Color(0x153B82F6) else Color(0x05000000), // Blue tint or very faint
-        label = "bannerBg"
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (isActive) Color(0x443B82F6) else Color(0x1A000000),
-        label = "bannerBorder"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(containerColor)
-            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
-            .clickable { onClick() }
-            .padding(16.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = if (isActive) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                    contentDescription = null,
-                    tint = if (isActive) Color(0xFF3B82F6) else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = if (isActive) "Stealth Mode Enabled" else "Stealth Mode Disabled",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isActive) Color(0xFF3B82F6) else MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = if (isActive) "Hides notifications for blocked apps" else "Grant notification access to hide notifications",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            if (!isActive) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF8B5CF6)) // Purple accent for stealth
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "ENABLE",
-                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun UninstallProtectionSettingsCard(isDarkTheme: Boolean, selectedLang: String) {
-    val context = LocalContext.current
-    var showDialog by remember { mutableStateOf(false) }
-    var selectedDays by remember { mutableIntStateOf(3) }
-    var isProtectionActive by remember { mutableStateOf(LockSettings.isUninstallProtectionActive(context)) }
-
-    fun t(key: String): String = Translations.get(key, selectedLang)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(32.dp))
-            .background(
-                if (isDarkTheme) {
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFF8B5CF6).copy(alpha = 0.15f),
-                            Color(0xFF4C1D95).copy(alpha = 0.1f)
-                        )
-                    )
-                } else {
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFFF3E8FF).copy(alpha = 0.9f),
-                            Color(0xFFD8B4FE).copy(alpha = 0.4f)
-                        )
-                    )
-                }
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.horizontalGradient(
-                    if (isDarkTheme) {
-                        listOf(Color(0xFF8B5CF6).copy(alpha = 0.4f), Color(0xFF6D28D9).copy(alpha = 0.15f))
-                    } else {
-                        listOf(Color(0xFF8B5CF6).copy(alpha = 0.3f), Color(0xFFD8B4FE).copy(alpha = 0.5f))
-                    }
-                ),
-                shape = RoundedCornerShape(32.dp)
-            )
-            .padding(24.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(if (isDarkTheme) Color(0xFF8B5CF6).copy(alpha = 0.25f) else Color(0xFF8B5CF6).copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Security,
-                            contentDescription = "Security Icon",
-                            tint = Color(0xFF8B5CF6),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = t("uninstall_protection_title"),
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = if (isDarkTheme) Color.White else Color(0xFF4C1D95)
-                        )
-                        Text(
-                            text = t("uninstall_protection_subtitle"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isDarkTheme) Color(0xFFC4B5FD) else Color(0xFF5B21B6)
-                        )
-                    }
-                }
-                
-                if (isProtectionActive) {
-                    val endMillis = remember { LockSettings.getUninstallProtectionEndTime(context) }
-                    val remain = maxOf(0L, endMillis - System.currentTimeMillis())
-                    val remainDays = (remain / (1000 * 60 * 60 * 24)).toInt()
-                    val remainHours = ((remain / (1000 * 60 * 60)) % 24).toInt()
-
-                    Column(horizontalAlignment = Alignment.End) {
-                        Icon(imageVector = Icons.Filled.Lock, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
-                        Text(
-                            text = "$remainDays ${t("days")}, $remainHours h",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF10B981)
-                        )
-                    }
-                } else {
-                    Button(
-                        onClick = { showDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(t("set_protection"), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = t("uninstall_protection_desc"),
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
-                color = if (isDarkTheme) Color(0xFFF3F4F6).copy(alpha = 0.8f) else Color(0xFF1F2937).copy(alpha = 0.9f)
-            )
-        }
-    }
-
-    if (showDialog && !isProtectionActive) {
-        Dialog(onDismissRequest = { showDialog = false }) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = if (isDarkTheme) Color(0xFF1E293B) else Color.White,
-                tonalElevation = 8.dp
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Security,
-                        contentDescription = null,
-                        tint = Color(0xFF8B5CF6),
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = t("uninstall_protection_title"),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDarkTheme) Color.White else Color.Black
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "${selectedDays} ${t("days")}",
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF8B5CF6)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        IconButton(
-                            onClick = { if (selectedDays > 1) selectedDays-- },
-                            modifier = Modifier
-                                .background(if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f), CircleShape)
-                        ) {
-                            Icon(imageVector = Icons.Filled.Remove, contentDescription = "Decrease", tint = if (isDarkTheme) Color.White else Color.Black)
-                        }
-                        Slider(
-                            value = selectedDays.toFloat(),
-                            onValueChange = { selectedDays = it.toInt() },
-                            valueRange = 1f..365f,
-                            steps = 364,
-                            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color(0xFF8B5CF6),
-                                activeTrackColor = Color(0xFF8B5CF6)
-                            )
-                        )
-                        IconButton(
-                            onClick = { if (selectedDays < 365) selectedDays++ },
-                            modifier = Modifier
-                                .background(if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f), CircleShape)
-                        ) {
-                            Icon(imageVector = Icons.Filled.Add, contentDescription = "Increase", tint = if (isDarkTheme) Color.White else Color.Black)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showDialog = false }) {
-                            Text(if (selectedLang == "ar") "إلغاء" else "Cancel", color = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF64748B))
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                LockSettings.setUninstallProtectionDays(context, selectedDays)
-                                isProtectionActive = true
-                                showDialog = false
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6))
-                        ) {
-                            Text(t("set_protection"), color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 // Complete Searchable App Selector Overlay Modal/Dialog
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2736,7 +2352,6 @@ fun LockdownScreen(
     onUnlock: () -> Unit
 ) {
     val context = LocalContext.current
-    val isStealthActive = remember { LockSettings.isStealthModeEnabled(context) }
     var timeLeft by remember { mutableIntStateOf(durationSecs) }
     
     // Intercept back click so they cannot exit ZenLock during lockdown

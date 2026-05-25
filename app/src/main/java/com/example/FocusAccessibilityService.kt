@@ -13,6 +13,9 @@ import android.widget.Toast
 
 class FocusAccessibilityService : AccessibilityService() {
 
+    private var lastBlockTime = 0L
+    private var currentToast: Toast? = null
+
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         try {
             val eventType = event.eventType
@@ -24,35 +27,32 @@ class FocusAccessibilityService : AccessibilityService() {
                 // Fast check to avoid heavy processing on every content change our own package
                 if (packageName == "com.example" || packageName == "com.android.systemui") return
                 
-                // Prevent uninstallation if protection is active
-                val isProtectionActive = LockSettings.isUninstallProtectionActive(this)
-                if (isProtectionActive) {
-                    if (packageName == "com.android.settings") {
-                        val rootNode = rootInActiveWindow
-                        val isUninstallPage = rootNode != null && (hasUninstallKeywords(rootNode))
-                        if (isUninstallPage) {
-                            val endMillis = LockSettings.getUninstallProtectionEndTime(this)
-                            val remain = maxOf(0L, endMillis - System.currentTimeMillis())
-                            val remainDays = (remain / (1000 * 60 * 60 * 24)).toInt()
-                            triggerBlock("adult_content_blocked_shield", true, "🛡️ حماية إزالة التطبيق نشطة! تنتهي بعد $remainDays يوم.")
-                            return
-                        }
-                    }
-                }
-                
                 // Check if lockdown session is active
                 val lockdownActive = LockSettings.isLockdownActive(this)
                 if (lockdownActive) {
+                    // Prevent uninstalling or deactivating ZenLock during an active focus/lockdown session
+                    if (packageName == "com.android.settings") {
+                        val rootNode = rootInActiveWindow
+                        if (rootNode != null && isTryingToUninstallOrDeactivate(rootNode)) {
+                            val lang = LockSettings.getSelectedLanguage(this)
+                            val blockMsg = if (lang == "ar") {
+                                "🛡️ لا يمكنك إلغاء تثبيت التطبيق أو إلغاء تنشيطه أثناء جلسة التركيز النشطة!"
+                            } else if (lang == "es") {
+                                "🛡️ ¡No puedes desinstalar o desactivar la aplicación durante una sesión de enfoque activa!"
+                            } else if (lang == "fr") {
+                                "🛡️ Vous ne pouvez pas désinstaller ou désactiver l'application pendant une session de mise au point active !"
+                            } else {
+                                "🛡️ You cannot uninstall or deactivate the app during an active focus session!"
+                            }
+                            triggerBlock("com.example", true, blockMsg)
+                            return
+                        }
+                    }
+
                     val antiPornEnabled = LockSettings.isAntiPornShieldEnabled(this)
                     
                     if (antiPornEnabled) {
-                        // 1. Shield settings (prevent disabling service or settings walkthroughs during lockdown)
-                        if (packageName == "com.android.settings") {
-                            triggerBlock("adult_content_blocked_shield", true, "🛡️ تم قفل الإعدادات حمايةً لالتزامك حتى انتهاء العداد!")
-                            return
-                        }
-                        
-                        // 2. Shield VPN and Proxy dialogs / applications
+                        // 1. Shield VPN and Proxy dialogs / applications
                         if (packageName == "com.android.vpndialogs" || 
                             packageName.contains("vpn", ignoreCase = true) || 
                             packageName.contains("proxy", ignoreCase = true) || 
@@ -91,6 +91,13 @@ class FocusAccessibilityService : AccessibilityService() {
     }
 
     private fun triggerBlock(pkgToReport: String, isHomeForceDouble: Boolean, toastMessage: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastBlockTime < 3000L) {
+            // Rate limit blocks to prevent endless UI loops or redundant intent launches
+            return
+        }
+        lastBlockTime = now
+
         // 1. Force back to Home screen
         performGlobalAction(GLOBAL_ACTION_HOME)
         if (isHomeForceDouble) {
@@ -98,10 +105,13 @@ class FocusAccessibilityService : AccessibilityService() {
             performGlobalAction(GLOBAL_ACTION_HOME)
         }
         
-        // 2. Show alert toast on main thread
+        // 2. Show alert toast on main thread with automatic cancellation of previous toasts
         Handler(Looper.getMainLooper()).post {
             try {
-                Toast.makeText(this, toastMessage, Toast.LENGTH_LONG).show()
+                currentToast?.cancel()
+                val toast = Toast.makeText(this, toastMessage, Toast.LENGTH_SHORT)
+                currentToast = toast
+                toast.show()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -175,30 +185,52 @@ class FocusAccessibilityService : AccessibilityService() {
         return false
     }
 
-    private fun hasUninstallKeywords(node: AccessibilityNodeInfo?): Boolean {
-        if (node == null) return false
+    private fun isTryingToUninstallOrDeactivate(rootNode: AccessibilityNodeInfo): Boolean {
+        val texts = mutableListOf<String>()
+        collectAllTexts(rootNode, texts)
         
-        val text = node.text?.toString()?.lowercase() ?: ""
-        val contentDesc = node.contentDescription?.toString()?.lowercase() ?: ""
+        var hasZenLock = false
+        var hasActionKeyword = false
         
-        if (text.contains("deactivate") || text.contains("إلغاء التنشيط") || text.contains("إلغاء تنشيط")
-           || text.contains("uninstall") || text.contains("إزالة التطبيق") || text.contains("إزالة التثبيت")
-           || text.contains("الغاء التثبيت") || contentDesc.contains("deactivate") || contentDesc.contains("uninstall")) {
-            
-            // Just double checking we are talking about this app (ZenLock) or Device Admin pages
-            if (text.contains("zenlock") || text.contains("responsables") || text.contains("device admin") || text.contains("مسؤول الجهاز") || text.contains("مسؤولو الجهاز")) {
-                return true
+        for (t in texts) {
+            val lower = t.lowercase()
+            if (lower.contains("zenlock")) {
+                hasZenLock = true
+            }
+            if (lower.contains("uninstall") || 
+                lower.contains("deactivate") || 
+                lower.contains("force stop") || 
+                lower.contains("disable") || 
+                lower.contains("turn off") ||
+                lower.contains("clear data") ||
+                lower.contains("إلغاء التثبيت") || 
+                lower.contains("إلغاء تنشيط") || 
+                lower.contains("إلغاء التنشيط") || 
+                lower.contains("فرض الإيقاف") || 
+                lower.contains("إيقاف إجباري") || 
+                lower.contains("إلغاء تفعيل") ||
+                lower.contains("مسح البيانات") ||
+                lower.contains("إيقاف") ||
+                lower.contains("إزالة")
+            ) {
+                hasActionKeyword = true
             }
         }
+        
+        return hasZenLock && hasActionKeyword
+    }
+
+    private fun collectAllTexts(node: AccessibilityNodeInfo?, list: MutableList<String>) {
+        if (node == null) return
+        node.text?.toString()?.let { list.add(it) }
+        node.contentDescription?.toString()?.let { list.add(it) }
         
         val childCount = node.childCount
         for (i in 0 until childCount) {
             val child = node.getChild(i) ?: continue
-            val found = hasUninstallKeywords(child)
+            collectAllTexts(child, list)
             child.recycle()
-            if (found) return true
         }
-        return false
     }
 
     override fun onInterrupt() {}

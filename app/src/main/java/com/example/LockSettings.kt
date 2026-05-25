@@ -8,10 +8,8 @@ object LockSettings {
     private const val PREFS_NAME = "zenlock_prefs"
     private const val KEY_BLOCKED_APPS = "blocked_apps"
     private const val KEY_LOCKDOWN_END = "lockdown_end"
-    private const val KEY_STEALTH_MODE_ENABLED = "stealth_mode_enabled"
     private const val KEY_ANTI_PORN_SHIELD_ENABLED = "anti_porn_shield_enabled"
     private const val KEY_IS_DARK_THEME = "is_dark_theme"
-    private const val KEY_UNINSTALL_PROTECTION_END = "uninstall_protection_end"
 
     fun isDarkThemePreferred(context: Context): Boolean? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -25,32 +23,6 @@ object LockSettings {
     fun setDarkThemePreferred(context: Context, isDark: Boolean) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putBoolean(KEY_IS_DARK_THEME, isDark).apply()
-    }
-
-    fun getUninstallProtectionEndTime(context: Context): Long {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getLong(KEY_UNINSTALL_PROTECTION_END, 0L)
-    }
-
-    fun setUninstallProtectionDays(context: Context, days: Int) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val endMillis = System.currentTimeMillis() + (days * 24L * 60L * 60L * 1000L)
-        prefs.edit().putLong(KEY_UNINSTALL_PROTECTION_END, endMillis).apply()
-    }
-
-    fun isUninstallProtectionActive(context: Context): Boolean {
-        val endMillis = getUninstallProtectionEndTime(context)
-        return System.currentTimeMillis() < endMillis
-    }
-
-    fun isStealthModeEnabled(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(KEY_STEALTH_MODE_ENABLED, false)
-    }
-
-    fun setStealthModeEnabled(context: Context, enabled: Boolean) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(KEY_STEALTH_MODE_ENABLED, enabled).apply()
     }
 
     fun isAntiPornShieldEnabled(context: Context): Boolean {
