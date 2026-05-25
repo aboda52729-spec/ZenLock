@@ -57,7 +57,20 @@ object Translations {
             "vpn_detected" to "🛡️ تم كشف اتصال VPN نشط! تم حظره فوراً لحمايتك.",
             "porn_content_detected" to "🛡️ تم حجب المحتوى تلقائياً بواسطة درع التعافي الذكي لـ ZenLock!",
             "focus_active_default_msg" to "🛡️ وضع التركيز نشط حالياً. تم تقييد الوصول لضمان إنتاجيتك.",
-            "language_selection" to "لغة التطبيق"
+            "language_selection" to "لغة التطبيق",
+            "settings_tab" to "الإعدادات",
+            "focus_tab" to "التركيز",
+            "theme_setting" to "مظهر التطبيق",
+            "light_mode" to "فاتح (مضيء)",
+            "dark_mode" to "داكن (مظلم)",
+            "uninstall_protection_setting" to "منع محاولات حذف التطبيق",
+            "uninstall_protection_desc" to "يمنع تماماً محاولات إلغاء تثبيت التطبيق أو إيقاف مسؤول الجهاز لضمان ثباتك بالتصميم الكامل.",
+            "uninstall_protection_duration" to "مدة حماية وحظر حذف التطبيق",
+            "always_active" to "دائماً نشط",
+            "duration_hours" to "ساعات",
+            "duration_days" to "أيام",
+            "default_lock_duration_setting" to "الوقت الافتراضي لإغلاق التطبيق",
+            "default_lock_duration_desc" to "تحديد الوقت الافتراضي لتشغيل العداد الصارم عند بدء جلسة التركيز."
         ),
         "en" to mapOf(
             "app_title" to "ZenLock",
@@ -104,7 +117,20 @@ object Translations {
             "vpn_detected" to "🛡️ Active VPN detected! Blocked instantly for your protection.",
             "porn_content_detected" to "🛡️ Content blocked by ZenLock Smart Recovery Shield!",
             "focus_active_default_msg" to "🛡️ Focus session active. Access restricted to maintain productivity.",
-            "language_selection" to "App Language"
+            "language_selection" to "App Language",
+            "settings_tab" to "Settings",
+            "focus_tab" to "Focus",
+            "theme_setting" to "App Theme",
+            "light_mode" to "Light",
+            "dark_mode" to "Dark",
+            "uninstall_protection_setting" to "Prevent App Deletion",
+            "uninstall_protection_desc" to "Completely blocks attempts to uninstall ZenLock or deactivate device admin to uphold your deep commitment.",
+            "uninstall_protection_duration" to "App Deletion Prevention Duration",
+            "always_active" to "Always Active",
+            "duration_hours" to "hours",
+            "duration_days" to "days",
+            "default_lock_duration_setting" to "Default Session Duration",
+            "default_lock_duration_desc" to "Setup the default timer length when quickly launching block sessions."
         ),
         "es" to mapOf(
             "app_title" to "ZenLock",
@@ -151,7 +177,20 @@ object Translations {
             "vpn_detected" to "🛡️ ¡Conexión VPN detectada! Bloqueada al instante para protegerte.",
             "porn_content_detected" to "🛡️ ¡Contenido bloqueado por el Escudo Inteligente ZenLock!",
             "focus_active_default_msg" to "🛡️ Sesión activa. Acceso restringido para maximizar tu productividad.",
-            "language_selection" to "Idioma"
+            "language_selection" to "Idioma",
+            "settings_tab" to "Ajustes",
+            "focus_tab" to "Enfoque",
+            "theme_setting" to "Tema de la App",
+            "light_mode" to "Claro",
+            "dark_mode" to "Oscuro",
+            "uninstall_protection_setting" to "Evitar Eliminación",
+            "uninstall_protection_desc" to "Bloquea intentos de desinstalación de ZenLock o desactivación del administrador del dispositivo.",
+            "uninstall_protection_duration" to "Duración de Protección Antieliminación",
+            "always_active" to "Siempre Activo",
+            "duration_hours" to "horas",
+            "duration_days" to "días",
+            "default_lock_duration_setting" to "Duración Predeterminada",
+            "default_lock_duration_desc" to "Define la duración estándar del temporizador al iniciar sesiones de manera rápida."
         ),
         "fr" to mapOf(
             "app_title" to "ZenLock",
@@ -198,7 +237,20 @@ object Translations {
             "vpn_detected" to "🛡️ VPN détecté ! Coupé instantanément par précaution.",
             "porn_content_detected" to "🛡️ Filtre système : page pour adultes interceptée avec succès !",
             "focus_active_default_msg" to "🛡️ Focus en cours. Accès limité pour vous guider vers vos objectifs.",
-            "language_selection" to "Langue de l'app"
+            "language_selection" to "Langue de l'app",
+            "settings_tab" to "Paramètres",
+            "focus_tab" to "Focus",
+            "theme_setting" to "Thème de l'application",
+            "light_mode" to "Clair",
+            "dark_mode" to "Sombre",
+            "uninstall_protection_setting" to "Empêcher la Suppression",
+            "uninstall_protection_desc" to "Bloque les tentatives de désinstallation de l'appareil ou de désactivation de l'administrateur.",
+            "uninstall_protection_duration" to "Durée de Protection Antisuppression",
+            "always_active" to "Toujours Actif",
+            "duration_hours" to "heures",
+            "duration_days" to "jours",
+            "default_lock_duration_setting" to "Durée de Session par Défaut",
+            "default_lock_duration_desc" to "Définit la longueur standard de la session lors du lancement d'un verrou."
         ),
         "hi" to mapOf(
             "app_title" to "ZenLock",
@@ -245,7 +297,20 @@ object Translations {
             "vpn_detected" to "🛡️ सक्रिय वीपीएन पकड़ा गया! आपकी सुरक्षा के लिए इसे तुरंत रोका गया।",
             "porn_content_detected" to "🛡️ ZenLock सचेत रिकवरी शील्ड द्वारा वयस्क सामग्री अवरुद्ध!",
             "focus_active_default_msg" to "🛡️ फोकस सत्र सक्रिय है। कार्यकुशल बने रहें।",
-            "language_selection" to "ऐप की भाषा"
+            "language_selection" to "ऐप की भाषा",
+            "settings_tab" to "सेटिंग्स",
+            "focus_tab" to "फोकस",
+            "theme_setting" to "ऐप थीम",
+            "light_mode" to "लाइट",
+            "dark_mode" to "डार्क",
+            "uninstall_protection_setting" to "ऐप डिलीट होने से रोकें",
+            "uninstall_protection_desc" to "आपकी प्रतिबद्धता बनाए रखने के लिए जेनपैक को अनइंस्टॉल करने या डिवाइस एडमिन अक्षम करने से पूरी तरह रोकता है।",
+            "uninstall_protection_duration" to "डिलीशन प्रिवेंशन की अवधि",
+            "always_active" to "हमेशा सक्रिय",
+            "duration_hours" to "घंटे",
+            "duration_days" to "दिन",
+            "default_lock_duration_setting" to "डिफ़ॉल्ट सत्र की अवधि",
+            "default_lock_duration_desc" to "ब्लॉक सेशन को तुरंत शुरू करते समय डिफ़ॉल्ट टाइमर की लंबाई सेट करें।"
         )
     )
 

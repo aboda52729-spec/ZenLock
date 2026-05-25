@@ -27,22 +27,38 @@ class FocusAccessibilityService : AccessibilityService() {
                 // Fast check to avoid heavy processing on every content change our own package
                 if (packageName == "com.example" || packageName == "com.android.systemui") return
                 
-                // Check if lockdown session is active
+                // Check if lockdown session or general uninstall protection is active
+                val isProtectionActive = LockSettings.isUninstallProtectionActive(this)
                 val lockdownActive = LockSettings.isLockdownActive(this)
-                if (lockdownActive) {
-                    // Prevent uninstalling or deactivating ZenLock during an active focus/lockdown session
+                
+                if (lockdownActive || isProtectionActive) {
+                    // Prevent uninstalling or deactivating ZenLock during active session/protection
                     if (packageName == "com.android.settings") {
                         val rootNode = rootInActiveWindow
                         if (rootNode != null && isTryingToUninstallOrDeactivate(rootNode)) {
                             val lang = LockSettings.getSelectedLanguage(this)
-                            val blockMsg = if (lang == "ar") {
-                                "🛡️ لا يمكنك إلغاء تثبيت التطبيق أو إلغاء تنشيطه أثناء جلسة التركيز النشطة!"
-                            } else if (lang == "es") {
-                                "🛡️ ¡No puedes desinstalar o desactivar la aplicación durante una sesión de enfoque activa!"
-                            } else if (lang == "fr") {
-                                "🛡️ Vous ne pouvez pas désinstaller ou désactiver l'application pendant une session de mise au point active !"
+                            val blockMsg = if (isProtectionActive) {
+                                val endMillis = LockSettings.getUninstallProtectionEndTime(this)
+                                val remain = maxOf(0L, endMillis - System.currentTimeMillis())
+                                val remainDays = (remain / (1000 * 60 * 60 * 24)).toInt()
+                                val remainHours = ((remain / (1000 * 60 * 60)) % 24).toInt()
+                                val remainMins = ((remain / (1000 * 60)) % 60).toInt()
+                                
+                                when (lang) {
+                                    "ar" -> if (remainDays > 0) "🛡️ حماية إزالة التطبيق نشطة! تنتهي بعد $remainDays يوم و $remainHours ساعة." else "🛡️ حماية إزالة التطبيق نشطة! تنتهي بعد $remainHours ساعة و $remainMins دقيقة."
+                                    "es" -> if (remainDays > 0) "🛡️ ¡Protección de desinstalación activa! Faltan $remainDays días y $remainHours horas." else "🛡️ ¡Protección de desinstalación activa! Faltan $remainHours horas y $remainMins minutos."
+                                    "fr" -> if (remainDays > 0) "🛡️ Protection de désinstallation active ! Faltent $remainDays jours." else "🛡️ Protection de désinstallation active ! Faltent $remainHours h et $remainMins m."
+                                    "hi" -> if (remainDays > 0) "🛡️ ऐप अनइंस्टॉल सुरक्षा सक्रिय! $remainDays दिन बाद समाप्त।" else "🛡️ ऐप अनइंस्टॉल सुरक्षा सक्रिय! $remainHours घंटे और $remainMins मिनट शेष।"
+                                    else -> if (remainDays > 0) "🛡️ Uninstall protection is active! Expires in $remainDays days and $remainHours hours." else "🛡️ Uninstall protection is active! Expires in $remainHours hours and $remainMins minutes."
+                                }
                             } else {
-                                "🛡️ You cannot uninstall or deactivate the app during an active focus session!"
+                                when (lang) {
+                                    "ar" -> "🛡️ لا يمكنك إلغاء تثبيت التطبيق أو إلغاء تنشيطه أثناء جلسة التركيز النشطة!"
+                                    "es" -> "🛡️ ¡No puedes desinstalar o desactivar la aplicación durante una sesión de enfoque activa!"
+                                    "fr" -> "🛡️ Vous ne pouvez pas désinstaller ou désactiver l'application pendant une session de mise au point active !"
+                                    "hi" -> "🛡️ सक्रिय फोकस सत्र के दौरान अनइंस्टॉल नहीं किया जा सकता!"
+                                    else -> "🛡️ You cannot uninstall or deactivate the app during an active focus session!"
+                                }
                             }
                             triggerBlock("com.example", true, blockMsg)
                             return

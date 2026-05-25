@@ -10,6 +10,8 @@ object LockSettings {
     private const val KEY_LOCKDOWN_END = "lockdown_end"
     private const val KEY_ANTI_PORN_SHIELD_ENABLED = "anti_porn_shield_enabled"
     private const val KEY_IS_DARK_THEME = "is_dark_theme"
+    private const val KEY_UNINSTALL_PROTECTION_END = "uninstall_protection_end"
+    private const val KEY_DEFAULT_DURATION_SECS = "default_duration_secs"
 
     fun isDarkThemePreferred(context: Context): Boolean? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -155,5 +157,31 @@ object LockSettings {
     fun setSelectedLanguage(context: Context, lang: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString("selected_language", lang).apply()
+    }
+
+    fun getUninstallProtectionEndTime(context: Context): Long {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getLong(KEY_UNINSTALL_PROTECTION_END, 0L)
+    }
+
+    fun setUninstallProtectionEndTime(context: Context, endTimeMillis: Long) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putLong(KEY_UNINSTALL_PROTECTION_END, endTimeMillis).apply()
+    }
+
+    fun isUninstallProtectionActive(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val endMillis = prefs.getLong(KEY_UNINSTALL_PROTECTION_END, 0L)
+        return System.currentTimeMillis() < endMillis
+    }
+
+    fun getDefaultDurationSecs(context: Context): Int {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getInt(KEY_DEFAULT_DURATION_SECS, 25 * 60) // Default 25 min
+    }
+
+    fun setDefaultDurationSecs(context: Context, secs: Int) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putInt(KEY_DEFAULT_DURATION_SECS, secs).apply()
     }
 }
