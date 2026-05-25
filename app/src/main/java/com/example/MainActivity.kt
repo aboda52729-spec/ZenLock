@@ -652,6 +652,7 @@ fun SetupScreen(
     val context = LocalContext.current
     var showAppPicker by remember { mutableStateOf(false) }
     var activeTab by remember { mutableIntStateOf(0) } // 0: Focus, 1: Settings
+    var protectionDaysSelected by remember { mutableIntStateOf(1) }
 
     val layoutDirection = if (selectedLang == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
 
@@ -1155,50 +1156,49 @@ fun SetupScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     // Uninstall Protection Card
-                    var protectionEnd by remember { mutableStateOf(LockSettings.getUninstallProtectionEndTime(context)) }
+                    var protectionEnd by remember(activeTab) { mutableStateOf(LockSettings.getUninstallProtectionEndTime(context)) }
                     val protectionActive = protectionEnd > System.currentTimeMillis()
                     
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(32.dp))
-                            .background(
-                                if (isDarkTheme) {
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color(0xFF6366F1).copy(alpha = 0.12f),
-                                            Color(0xFF312E81).copy(alpha = 0.08f)
-                                        )
-                                    )
-                                } else {
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color(0xFFEEF2FF).copy(alpha = 0.9f),
-                                            Color(0xFFC7D2FE).copy(alpha = 0.3f)
-                                        )
-                                    )
-                                }
-                            )
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.horizontalGradient(
+                    if (!protectionActive) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(32.dp))
+                                .background(
                                     if (isDarkTheme) {
-                                        listOf(Color(0xFF818CF8).copy(alpha = 0.35f), Color(0xFF312E81).copy(alpha = 0.1f))
+                                        Brush.verticalGradient(
+                                            listOf(
+                                                Color(0xFF6366F1).copy(alpha = 0.12f),
+                                                Color(0xFF312E81).copy(alpha = 0.08f)
+                                            )
+                                        )
                                     } else {
-                                        listOf(Color(0xFF6366F1).copy(alpha = 0.25f), Color(0xFFC7D2FE).copy(alpha = 0.4f))
+                                        Brush.verticalGradient(
+                                            listOf(
+                                                Color(0xFFEEF2FF).copy(alpha = 0.9f),
+                                                Color(0xFFC7D2FE).copy(alpha = 0.3f)
+                                            )
+                                        )
                                     }
-                                ),
-                                shape = RoundedCornerShape(32.dp)
-                            )
-                            .padding(24.dp)
-                    ) {
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.horizontalGradient(
+                                        if (isDarkTheme) {
+                                            listOf(Color(0xFF818CF8).copy(alpha = 0.35f), Color(0xFF312E81).copy(alpha = 0.1f))
+                                        } else {
+                                            listOf(Color(0xFF6366F1).copy(alpha = 0.25f), Color(0xFFC7D2FE).copy(alpha = 0.4f))
+                                        }
+                                    ),
+                                    shape = RoundedCornerShape(32.dp)
+                                )
+                                .padding(24.dp)
+                        ) {
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Box(
                                         modifier = Modifier
                                             .size(40.dp)
@@ -1222,81 +1222,81 @@ fun SetupScreen(
                                         )
                                     }
                                 }
-                                
-                                Switch(
-                                    checked = protectionActive,
-                                    onCheckedChange = { active ->
-                                        if (active) {
-                                            val end = System.currentTimeMillis() + (24 * 60 * 60 * 1000L) // Default 24h
-                                            LockSettings.setUninstallProtectionEndTime(context, end)
-                                            protectionEnd = end
-                                        } else {
-                                            LockSettings.setUninstallProtectionEndTime(context, 0L)
-                                            protectionEnd = 0L
-                                        }
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = Color(0xFF6366F1),
-                                        uncheckedThumbColor = if (isDarkTheme) Color(0xFF64748B) else Color(0xFF94A3B8),
-                                        uncheckedTrackColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
-                                    )
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = t("uninstall_protection_desc"),
-                                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
-                                color = if (isDarkTheme) Color(0xFFE2E8F0) else Color(0xFF334155)
-                            )
-                            
-                            if (protectionActive) {
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
                                 Text(
-                                    text = t("uninstall_protection_duration") + ":",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = if (isDarkTheme) Color(0xFFC7D2FE) else Color(0xFF312E81)
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
-                                val options = listOf(
-                                    Pair("1h", 1 * 60 * 60 * 1000L),
-                                    Pair("12h", 12 * 60 * 60 * 1000L),
-                                    Pair("1d", 24 * 60 * 60 * 1000L),
-                                    Pair("3d", 3 * 24 * 60 * 60 * 1000L),
-                                    Pair("7d", 7 * 24 * 60 * 60 * 1000L)
+                                    text = t("uninstall_protection_desc"),
+                                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+                                    color = if (isDarkTheme) Color(0xFFE2E8F0) else Color(0xFF334155)
                                 )
                                 
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.fillMaxWidth()
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                // Beautiful 3D scrollable time picker for DAYS only
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(168.dp),
+                                    contentAlignment = Alignment.TopCenter
                                 ) {
-                                    options.forEach { (label, durationMs) ->
-                                        val currentTime = System.currentTimeMillis()
-                                        val isCurrent = Math.abs((protectionEnd - currentTime) - durationMs) < 120_000L
-                                        
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(
-                                                    if (isCurrent) Color(0xFF6366F1)
-                                                    else (if (isDarkTheme) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))
-                                                )
-                                                .clickable {
-                                                    val end = System.currentTimeMillis() + durationMs
-                                                    LockSettings.setUninstallProtectionEndTime(context, end)
-                                                    protectionEnd = end
-                                                }
-                                                .padding(horizontal = 14.dp, vertical = 8.dp)
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                                color = if (isCurrent) Color.White else (if (isDarkTheme) Color.White.copy(alpha = 0.8f) else Color(0xFF475569))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.85f)
+                                            .height(52.dp)
+                                            .offset(y = 40.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(
+                                                if (isDarkTheme) Color(0xFF6366F1).copy(alpha = 0.12f) else Color(0xFF6366F1).copy(alpha = 0.05f)
                                             )
-                                        }
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxSize(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        TimeDrumColumn(
+                                            value = protectionDaysSelected,
+                                            labelArabic = "أيام",
+                                            labelEnglish = "DAYS",
+                                            range = 1..365,
+                                            isDarkTheme = isDarkTheme,
+                                            onValueChange = { newDays ->
+                                                protectionDaysSelected = newDays
+                                            }
+                                        )
                                     }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(20.dp))
+                                
+                                // Activation action button
+                                Button(
+                                    onClick = {
+                                        val durationMs = protectionDaysSelected * 24L * 60L * 60L * 1000L
+                                        val end = System.currentTimeMillis() + durationMs
+                                        LockSettings.setUninstallProtectionEndTime(context, end)
+                                        protectionEnd = end
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF6366F1)
+                                    ),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = t("confirm_uninstall_protection"),
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = Color.White
+                                    )
                                 }
                             }
                         }

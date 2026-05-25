@@ -70,7 +70,8 @@ object Translations {
             "duration_hours" to "ساعات",
             "duration_days" to "أيام",
             "default_lock_duration_setting" to "الوقت الافتراضي لإغلاق التطبيق",
-            "default_lock_duration_desc" to "تحديد الوقت الافتراضي لتشغيل العداد الصارم عند بدء جلسة التركيز."
+            "default_lock_duration_desc" to "تحديد الوقت الافتراضي لتشغيل العداد الصارم عند بدء جلسة التركيز.",
+            "confirm_uninstall_protection" to "تأكيد حماية حذف التطبيق"
         ),
         "en" to mapOf(
             "app_title" to "ZenLock",
@@ -130,7 +131,8 @@ object Translations {
             "duration_hours" to "hours",
             "duration_days" to "days",
             "default_lock_duration_setting" to "Default Session Duration",
-            "default_lock_duration_desc" to "Setup the default timer length when quickly launching block sessions."
+            "default_lock_duration_desc" to "Setup the default timer length when quickly launching block sessions.",
+            "confirm_uninstall_protection" to "Confirm Deletion Protection"
         ),
         "es" to mapOf(
             "app_title" to "ZenLock",
@@ -190,7 +192,8 @@ object Translations {
             "duration_hours" to "horas",
             "duration_days" to "días",
             "default_lock_duration_setting" to "Duración Predeterminada",
-            "default_lock_duration_desc" to "Define la duración estándar del temporizador al iniciar sesiones de manera rápida."
+            "default_lock_duration_desc" to "Define la duración estándar del temporizador al iniciar sesiones de manera rápida.",
+            "confirm_uninstall_protection" to "Confirmar Protección de Eliminación"
         ),
         "fr" to mapOf(
             "app_title" to "ZenLock",
@@ -250,7 +253,8 @@ object Translations {
             "duration_hours" to "heures",
             "duration_days" to "jours",
             "default_lock_duration_setting" to "Durée de Session par Défaut",
-            "default_lock_duration_desc" to "Définit la longueur standard de la session lors du lancement d'un verrou."
+            "default_lock_duration_desc" to "Définit la longueur standard de la session lors du lancement d'un verrou.",
+            "confirm_uninstall_protection" to "Confirmer la Protection de Suppression"
         ),
         "hi" to mapOf(
             "app_title" to "ZenLock",
@@ -310,7 +314,8 @@ object Translations {
             "duration_hours" to "घंटे",
             "duration_days" to "दिन",
             "default_lock_duration_setting" to "डिफ़ॉल्ट सत्र की अवधि",
-            "default_lock_duration_desc" to "ब्लॉक सेशन को तुरंत शुरू करते समय डिफ़ॉल्ट टाइमर की लंबाई सेट करें।"
+            "default_lock_duration_desc" to "ब्लॉक सेशन को तुरंत शुरू करते समय डिफ़ॉल्ट टाइमर की लंबाई सेट करें।",
+            "confirm_uninstall_protection" to "डिलिशन प्रोटेक्शन की पुष्टि करें"
         )
     )
 
