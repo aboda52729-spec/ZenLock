@@ -11,7 +11,8 @@ class ZenLockNotificationListener : NotificationListenerService() {
         sbn?.let {
             val packageName = it.packageName
             // Fast check
-            if (packageName == "com.example" || packageName == "com.android.systemui") return
+            val myPkg = this.packageName
+            if (packageName == myPkg || packageName == "com.example" || packageName == "com.android.systemui") return
             
             if (LockSettings.isLockdownActive(this) && LockSettings.isAppBlocked(this, packageName)) {
                 Log.d("ZenLockNotification", "Blocked notification from: $packageName")

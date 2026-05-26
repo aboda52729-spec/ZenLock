@@ -123,8 +123,8 @@ dependencies {
 // Automatically generate density-specific legacy fallback launcher PNGs (Configuration Cache friendly)
 tasks.register("copyLauncherIcons") {
   val projectDirFile = project.layout.projectDirectory.asFile
-  val src = File(projectDirFile, "src/main/res/drawable/custom_app_icon.png")
-  inputs.file(src)
+  val logoFile = File(projectDirFile, "src/main/res/drawable/zenlock_logo_1779606754101.png")
+  inputs.file(logoFile)
   val densities = listOf("hdpi", "mdpi", "xhdpi", "xxhdpi", "xxxhdpi")
   densities.forEach { d ->
     outputs.file(File(projectDirFile, "src/main/res/mipmap-$d/ic_launcher.png"))
@@ -132,13 +132,36 @@ tasks.register("copyLauncherIcons") {
   }
   
   doLast {
-    if (src.exists()) {
-      densities.forEach { d ->
-        val destDir = File(projectDirFile, "src/main/res/mipmap-$d")
-        destDir.mkdirs()
-        src.copyTo(File(destDir, "ic_launcher.png"), overwrite = true)
-        src.copyTo(File(destDir, "ic_launcher_round.png"), overwrite = true)
+    val iconGenJava = File(projectDirFile, "IconGen.java")
+    if (iconGenJava.exists()) {
+      println("Compiling IconGen.java...")
+      val compileProcess = ProcessBuilder("javac", iconGenJava.name)
+        .directory(projectDirFile)
+        .redirectErrorStream(true)
+        .start()
+      val compileLogs = compileProcess.inputStream.bufferedReader().readText()
+      val compileResult = compileProcess.waitFor()
+      if (compileResult == 0) {
+        println("Running IconGen...")
+        val runProcess = ProcessBuilder("java", "-cp", ".", "IconGen")
+          .directory(projectDirFile)
+          .redirectErrorStream(true)
+          .start()
+        val runLogs = runProcess.inputStream.bufferedReader().readText()
+        val runResult = runProcess.waitFor()
+        if (runResult == 0) {
+          println("IconGen output: $runLogs")
+          println("Successfully generated legacy launcher PNGs for all densities.")
+        } else {
+          println("IconGen run failed with code $runResult. Logs:\n$runLogs")
+          throw GradleException("IconGen execution failed with code $runResult")
+        }
+      } else {
+        println("IconGen compilation failed with code $compileResult. Logs:\n$compileLogs")
+        throw GradleException("IconGen compilation failed")
       }
+    } else {
+      println("IconGen.java does not exist at ${iconGenJava.absolutePath}")
     }
   }
 }

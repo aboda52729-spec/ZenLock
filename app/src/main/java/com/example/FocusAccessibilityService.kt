@@ -25,7 +25,8 @@ class FocusAccessibilityService : AccessibilityService() {
                 val packageName = event.packageName?.toString() ?: return
                 
                 // Fast check to avoid heavy processing on every content change our own package
-                if (packageName == "com.example" || packageName == "com.android.systemui") return
+                val myPkg = this.packageName
+                if (packageName == myPkg || packageName == "com.example" || packageName == "com.android.systemui") return
                 
                 // Check if lockdown session or general uninstall protection is active
                 val isProtectionActive = LockSettings.isUninstallProtectionActive(this)
@@ -60,7 +61,7 @@ class FocusAccessibilityService : AccessibilityService() {
                                     else -> "🛡️ You cannot uninstall or deactivate the app during an active focus session!"
                                 }
                             }
-                            triggerBlock("com.example", true, blockMsg)
+                            triggerBlock(myPkg, true, blockMsg)
                             return
                         }
                     }
@@ -95,7 +96,7 @@ class FocusAccessibilityService : AccessibilityService() {
                     }
                     
                     // 5. Existing lockdown logic: block targeted distracting apps
-                    if (LockSettings.isAppBlocked(this, packageName)) {
+                    if (lockdownActive && LockSettings.isAppBlocked(this, packageName)) {
                         triggerBlock(packageName, false, "🛡️ وضع التركيز نشط حالياً. تم تقييد الوصول لضمان إنتاجيتك.")
                         return
                     }
